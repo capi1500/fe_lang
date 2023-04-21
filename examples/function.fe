@@ -1,0 +1,8 @@
+fn fiz(a: i32) -> bool {
+	fn fiz(b: bool, c: i32, d: char) -> i32 {
+	}
+}
+
+fn foo() {
+	
+}

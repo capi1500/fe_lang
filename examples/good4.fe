@@ -1,0 +1,76 @@
+struct Foo {
+	x: i64,
+	flag: bool,
+	name: str,
+}
+
+struct None {}
+
+fn change_foo(v: &mut Foo) {
+	if (v.flag) {
+		v.x += 5;
+		v.flag = false;
+	} else {
+		v.flag = true;
+	}
+}
+
+fn print_foo(v: &Foo) {
+	print_str("Foo {\n");
+	print_char('\t');
+	print_i64(v.x);
+	print_str(",\n");
+	print_char('\t');
+	print_bool(v.flag);
+	print_str(",\n");
+	print_char('\t');
+	print_str(v.name);
+	print_str("\n}");
+}
+
+variant Option_Foo {
+	Foo,
+	None
+}
+
+fn some_foo(value: Foo) -> Option_Foo {
+	Option_Foo(value)
+}
+
+fn none_foo() -> Option_Foo {
+	Option_Foo(None{})
+}
+
+fn min(first: &'a Foo, second: &'a Foo) -> &'a Foo {
+	if (first.x < second.x) {
+		first
+	} else {
+		second
+	}
+}
+
+
+fn main() {
+	const name = input_str();
+	const len = name.length;
+	const flag = len % 2 == 0;
+
+	const foo_option = if (len == 0) {
+		some_foo(Foo{
+			x: len,
+			flag,
+			name,
+		})
+	} else {
+		none_foo()
+	};
+	
+	match (foo_option) {
+		Some(foo) => {
+			const copied = copy(&foo);
+			change_foo(&mut foo);
+			print_foo(min(&copied, &foo));
+		},
+		_ => print_str("None"),
+	}
+}

@@ -1,0 +1,146 @@
+Code. Code ::= [Statement] ;
+SemicolonStatement. Statement ::= ";" ;
+ItemStatement. Statement ::= Item ;
+ExpressionStatement. Statement ::= Expression ;
+separator Statement "" ;
+
+rules Item ::= Function | Struct | Variant | Variable | Const ;
+
+Function. Function ::= "fn" Ident "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
+Parameter. FunctionParam ::= Ident ":" Type ;
+separator FunctionParam "," ;
+ReturnValue. FunctionReturnType ::= "->" Type ;
+ReturnUnit. FunctionReturnType ::= ;
+
+Struct. Struct ::= "struct" Ident "{" [StructField] "}" ;
+StructField. StructField ::= Ident ":" Type ;
+separator StructField "," ;
+
+Variant. Variant ::= "variant" Ident "{" [VariantItem] "}" ;
+VariantItem. VariantItem ::= Type ;
+separator VariantItem "," ;
+
+
+Variable. Variable ::= "var" CVDeclaration ;
+Const. Const ::= "const" CVDeclaration ;
+CVDeclaration. CVDeclaration ::= Ident TypeDeclaration "=" Expression1 ";" ;
+Typed. TypeDeclaration ::= ":" Type ;
+Untyped. TypeDeclaration ::= ;
+
+TypeSimpleType. Type ::= TypeModifier SimpleType ;
+TypeArrayType. Type ::= TypeModifier ArrayType ;
+TypeFunctionType. Type ::= FunctionType ;
+
+None. TypeModifier ::= "" ; 
+Ref. TypeModifier ::= "&" ;
+RefLifetime. TypeModifier ::= "&" Lifetime ;
+MutRef. TypeModifier ::= "&" "mut" ;
+MutRefLifetime. TypeModifier ::= "&" Lifetime "mut" ;
+Lifetime. Lifetime ::= "'" Ident ;
+
+SimpleType. SimpleType ::= Ident ;
+ArrayTypeSized. ArrayType ::= "[" Type ";" Expression1 "]" ;
+ArrayType. ArrayType ::= "[" Type "]" ;
+FunctionType. FunctionType ::= "fn" "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
+FunctionTypeParam. FunctionTypeParam ::= Type ;
+separator FunctionTypeParam "," ;
+FunctionTypeReturnType. FunctionTypeReturnType ::= "->" Type ;
+FunctionTypeReturnTypeUnit. FunctionTypeReturnType ::= ;
+
+BlockExpression. Expression18 ::= "{" [Statement] "}" ;
+GroupedExpression. Expression17 ::= "(" Expression1 ")" ;
+
+IfExpression. Expression16 ::= IfExpression ;
+If. IfExpression ::= "if" Expression17 Expression18 ;
+IfElse. IfExpression ::= "if" Expression17 Expression18 "else" Expression18 ;
+IfElseIf. IfExpression ::= "if" Expression17 Expression18 "else" IfExpression ;
+WhileExpression. Expression16 ::= "while" Expression17 Expression18 ;
+ForExpression. Expression16 ::= "for" "(" Pattern "in" Expression1 ")" Expression18 ;
+MatchExpression. Expression16 ::= "match" Expression17 "{" [MatchArm] "}" ;
+MatchArm. MatchArm ::= Pattern "=>" Expression;
+separator MatchArm "," ;
+
+rules Literal ::= Char | String | Integer | Double | Boolean ;
+LiteralExpression. Expression16 ::= Literal ;
+VariableExpression. Expression16 ::= Ident ;
+StructExpression. Expression16 ::= Ident "{" [StructExpressionField] "}" ;
+StructExpressionField. StructExpressionField ::= Ident ":" Expression1 ;
+StructExpressionFieldDefault. StructExpressionField ::= Ident ;
+separator StructExpressionField "," ;
+ArrayExpressionItems. Expression16 ::= "[" [ArrayElement] "]" ;
+ArrayExpressionDefault. Expression16 ::= "[" Expression1 ";" Expression1 "]" ;
+ArrayElement. ArrayElement ::= Expression1 ;
+separator ArrayElement "," ;
+ClousureExpression. Expression16 ::= "|" [Capture] "|" "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
+Capture. Capture ::= TypeModifier Ident ;
+separator Capture "," ;
+
+FieldExpression. Expression15 ::= Expression15 "." Ident ;
+
+CallExpression. Expression14 ::= Expression14 "(" [CallParam] ")" ;
+CallParam. CallParam ::= Expression1 ;
+separator CallParam "," ;
+IndexExpression. Expression14 ::= Expression14 "[" Expression1 "]" ;
+
+UnaryExpression. Expression13 ::= UnaryOperator Expression14 ;
+TypeCastExpression. Expression12 ::= Expression13 "as" Type ;
+MultiplyExpression. Expression11 ::= Expression11 "*" Expression12 ;
+DivideExpression. Expression11 ::= Expression11 "/" Expression12 ;
+ModuloExpression. Expression11 ::= Expression11 "%" Expression12 ;
+PlusExpression. Expression10 ::= Expression10 "+" Expression11 ;
+MinusExpression. Expression10 ::= Expression10 "-" Expression11 ;
+LShiftExpression. Expression8 ::= Expression9 "<<" Expression10 ;
+RShiftExpression. Expression8 ::= Expression9 ">>" Expression10 ;
+BitAndExpression. Expression8 ::= Expression8 "&" Expression9 ;
+BitXOrExpression. Expression7 ::= Expression7 "^" Expression8 ;
+BitOrExpression. Expression6 ::= Expression6 "|" Expression7 ;
+ComparisonExpression. Expression5 ::= Expression5 ComparisonOperator Expression6 ;
+LazyAndExpression. Expression4 ::= Expression4 "&&" Expression5 ;
+LazyOrExpression. Expression3 ::= Expression3 "||" Expression4 ;
+RangeExpression. Expression2 ::= Expression3 ".." Expression3 ;
+AssignmentExpression. Expression1 ::= Expression2 AssignmentOperator Expression1;
+
+BreakExpression. Expression ::= "break" ;
+ContinueExpression. Expression ::= "continue" ;
+ReturnExpressionUnit. Expression ::= "return" ;
+ReturnExpressionValue. Expression ::= "return" Expression1 ;
+
+coercions Expression 18 ;
+
+UnaryMinus. UnaryOperator ::= "-" ;
+UnaryNegation. UnaryOperator ::= "!" ;
+Dereference. UnaryOperator ::= "*" ;
+Reference. UnaryOperator ::= "&" ;
+ReferenceMut. UnaryOperator ::= "&" "mut" ;
+
+
+Assign. AssignmentOperator ::= "=" ;
+PlusEqual. AssignmentOperator ::= "+=" ;
+MinusEqual. AssignmentOperator ::= "-=" ;
+MultiplyEqual. AssignmentOperator ::= "*=" ;
+DivideEqual. AssignmentOperator ::= "/=" ;
+ModuloEqual. AssignmentOperator ::= "%=" ;
+AndEqual. AssignmentOperator ::= "&=" ;
+OrEqual. AssignmentOperator ::= "|=" ;
+XorEqual. AssignmentOperator ::= "^=" ;
+LShiftEqual. AssignmentOperator ::= "<<=" ;
+RShiftEqual. AssignmentOperator ::= ">>=" ;
+
+Equals. ComparisonOperator ::= "==" ;
+NotEquals. ComparisonOperator ::= "!=" ;
+Greater. ComparisonOperator ::= ">" ;
+Smaller. ComparisonOperator ::= "<" ;
+GreaterEquals. ComparisonOperator ::= ">=" ;
+SmallerEquals. ComparisonOperator ::= "<=" ;
+
+VariantPattern. Pattern ::= Ident "(" Pattern ")" ;
+StructPattern. Pattern ::= Ident "{" [Pattern] "}" ;
+AssignPattern. Pattern ::= Ident ;
+AllPattern. Pattern ::= "_" ;
+separator Pattern "," ;
+
+BoolTrue. Boolean ::= "true" ;
+BoolFalse. Boolean ::= "false" ;
+
+comment "//" ;
+comment "/*" "*/" ;

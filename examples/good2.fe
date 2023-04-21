@@ -1,0 +1,12 @@
+fn nice_print(printer: fn() -> string) {
+    print_str("Very nice printing");
+    print_str(printer());
+}
+
+fn main() {
+    for (x in (1..10)) {
+        nice_print(|&x|(a: i32) -> string { // borrow x
+            int_to_string((x + 6 * 4 - 3) % 6)
+        }); // Should print (x + (6 * 4) - 3) % 6
+    }
+}
