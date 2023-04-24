@@ -147,7 +147,7 @@ fn main() {
 # Gramatyka
 Inspirowana gramatyką RUSTa z https://doc.rust-lang.org/reference/
 
-```bnf
+```lbnf
 Code. Code ::= [Statement] ;
 SemicolonStatement. Statement ::= ";" ;
 ItemStatement. Statement ::= Item ;

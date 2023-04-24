@@ -4,7 +4,10 @@ ItemStatement. Statement ::= Item ;
 ExpressionStatement. Statement ::= Expression ;
 separator Statement "" ;
 
-rules Item ::= Function | Struct | Variant | Variable | Const ;
+ItemFunction. Item ::= Function ;
+ItemStruct. Item ::= Struct ;
+ItemVariant. Item ::= Variant ;
+ItemVariable. Item ::= CV Ident TypeDeclaration Initialization ";" ;
 
 Function. Function ::= "fn" Ident "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
 Parameter. FunctionParam ::= Ident ":" Type ;
@@ -16,14 +19,15 @@ Struct. Struct ::= "struct" Ident "{" [StructField] "}" ;
 StructField. StructField ::= Ident ":" Type ;
 separator StructField "," ;
 
-Variant. Variant ::= "variant" Ident "{" [VariantItem] "}" ;
-VariantItem. VariantItem ::= Type ;
-separator VariantItem "," ;
+Variant. Variant ::= "variant" Ident "{" [VariantSubtype] "}" ;
+VariantSubtype. VariantSubtype ::= Type ;
+separator VariantSubtype "," ;
 
+Const. CV ::= "const" ;
+Var. CV ::= "var" ;
+Initialized. Initialization ::= "=" Expression1 ;
+UnInitialized. Initialization ::= ;
 
-Variable. Variable ::= "var" CVDeclaration ;
-Const. Const ::= "const" CVDeclaration ;
-CVDeclaration. CVDeclaration ::= Ident TypeDeclaration "=" Expression1 ";" ;
 Typed. TypeDeclaration ::= ":" Type ;
 Untyped. TypeDeclaration ::= ;
 
@@ -32,16 +36,17 @@ TypeArrayType. Type ::= TypeModifier ArrayType ;
 TypeFunctionType. Type ::= FunctionType ;
 
 None. TypeModifier ::= "" ; 
-Ref. TypeModifier ::= "&" ;
-RefLifetime. TypeModifier ::= "&" Lifetime ;
-MutRef. TypeModifier ::= "&" "mut" ;
-MutRefLifetime. TypeModifier ::= "&" Lifetime "mut" ;
-Lifetime. Lifetime ::= "'" Ident ;
+Ref. TypeModifier ::= "&" Lifetime ;
+MutRef. TypeModifier ::= "&" Lifetime "mut" ;
+ExplicitLifetime. Lifetime ::= "'" Ident ;
+ImplicitLifetime. Lifetime ::= ;
 
 SimpleType. SimpleType ::= Ident ;
 ArrayTypeSized. ArrayType ::= "[" Type ";" Expression1 "]" ;
 ArrayType. ArrayType ::= "[" Type "]" ;
-FunctionType. FunctionType ::= "fn" "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
+FunctionType. FunctionType ::= FunctionKind Lifetime "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
+Once. FunctionKind ::= "FnOnce" ;
+Normal. FunctionKind ::= "Fn" ;
 FunctionTypeParam. FunctionTypeParam ::= Type ;
 separator FunctionTypeParam "," ;
 FunctionTypeReturnType. FunctionTypeReturnType ::= "->" Type ;
@@ -60,7 +65,7 @@ MatchExpression. Expression16 ::= "match" Expression17 "{" [MatchArm] "}" ;
 MatchArm. MatchArm ::= Pattern "=>" Expression;
 separator MatchArm "," ;
 
-rules Literal ::= Char | String | Integer | Double | Boolean ;
+rules Literal ::= Char | String | Integer | Boolean ;
 LiteralExpression. Expression16 ::= Literal ;
 VariableExpression. Expression16 ::= Ident ;
 StructExpression. Expression16 ::= Ident "{" [StructExpressionField] "}" ;

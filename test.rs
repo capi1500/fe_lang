@@ -1,54 +1,51 @@
-// 4
-fn foo(x: i32) {
-	println!("{}", x)
+fn make_incrementor<'a>(r: &'a mut i32) -> impl FnMut() + 'a {
+	move || {
+		*r += 1;
+	}
 }
 
-// 2
-fn bar() -> Box<dyn Fn(i32) -> i32> {
-	let x = 5;
-	let foo = move |y| x + y;
-	return Box::new(foo);
+fn h() {
+	let mut x = 5;
+	let mut f = make_incrementor(&mut x);
+	f();
+	drop(f); // bez drop nie działa, bo f ma explicit lifetime 'a==lifetime x
+	println!("{}", &x);
 }
 
-// fn bis() -> Box<dyn FnMut()> {
-// 	let mut x = 5;
-// 	let foo = || {
-// 		x += 1;
-// 		println!("{}", x);
-// 	};
+fn g() {
+	let mut x = 5;
+	let mut f = || {
+		x += 1;
+	}; // tutaj f ma któtszy lifetime niż x
+	f();
+	println!("{}", &x);
+}
 
-
-// --> test.rs:15:12
-// 	|
-//  15 |     let foo = || {
-// 	|               ^^ may outlive borrowed value `x`
-//  16 |         x += 1;
-// 	|         - `x` is borrowed here
-// 	|
-//  note: closure is returned here
-//    --> test.rs:19:9
-// 	|
-//  19 |     return Box::new(foo);
-// 	|            ^^^^^^^^^^^^^
-//  help: to force the closure to take ownership of `x` (and any other referenced variables), use the `move` keyword
-// 	|
-//  15 |     let foo = move || {
-// 	|               ++++
- 
-//  error: aborting due to previous error
-
-
-// 	return Box::new(foo);
-// }
-
-fn main() {
-	// 4
-	foo({
-		let a = 4;
-		a * 2
+fn i() {
+	#[derive(Debug)]
+	struct Foo {
+		x: i32
+	}
+	
+	fn foo(a: Foo) {
+		println!("Do stuff {:?}", a);
+	}
+	
+	foo(Foo{
+		x: 5
 	});
 	
-	// 2
-	let f = bar();
-	println!("{}", f(1));
+	struct Foo {
+		y: i32
+	}
+	
+	let a: Foo {
+		y: 6
+	};
+	
+	println!("{}", a.y);
+}
+
+fn main() {
+	i();
 }

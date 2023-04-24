@@ -32,8 +32,7 @@ instance HasAnnotation A.Item' where
     A.ItemFunction p _ -> p
     A.ItemStruct p _ -> p
     A.ItemVariant p _ -> p
-    A.ItemVariable p _ -> p
-    A.ItemConst p _ -> p
+    A.ItemVariable p _ _ _ _ -> p
 
 instance HasAnnotation A.Function' where
   getAnnotation = \case
@@ -60,21 +59,14 @@ instance HasAnnotation A.Variant' where
   getAnnotation = \case
     A.Variant p _ _ -> p
 
-instance HasAnnotation A.VariantItem' where
+instance HasAnnotation A.VariantSubtype' where
   getAnnotation = \case
-    A.VariantItem p _ -> p
+    A.VariantSubtype p _ -> p
 
-instance HasAnnotation A.Variable' where
+instance HasAnnotation A.Initialization' where
   getAnnotation = \case
-    A.Variable p _ -> p
-
-instance HasAnnotation A.Const' where
-  getAnnotation = \case
-    A.Const p _ -> p
-
-instance HasAnnotation A.CVDeclaration' where
-  getAnnotation = \case
-    A.CVDeclaration p _ _ _ -> p
+    A.Initialized p _ -> p
+    A.UnInitialized p -> p
 
 instance HasAnnotation A.TypeDeclaration' where
   getAnnotation = \case
@@ -90,14 +82,13 @@ instance HasAnnotation A.Type' where
 instance HasAnnotation A.TypeModifier' where
   getAnnotation = \case
     A.None p -> p
-    A.Ref p -> p
-    A.RefLifetime p _ -> p
-    A.MutRef p -> p
-    A.MutRefLifetime p _ -> p
+    A.Ref p _ -> p
+    A.MutRef p _ -> p
 
 instance HasAnnotation A.Lifetime' where
   getAnnotation = \case
-    A.Lifetime p _ -> p
+    A.ExplicitLifetime p _ -> p
+    A.ImplicitLifetime p -> p
 
 instance HasAnnotation A.SimpleType' where
   getAnnotation = \case
@@ -110,7 +101,7 @@ instance HasAnnotation A.ArrayType' where
 
 instance HasAnnotation A.FunctionType' where
   getAnnotation = \case
-    A.FunctionType p _ _ -> p
+    A.FunctionType p _ _ _ _ -> p
 
 instance HasAnnotation A.FunctionTypeParam' where
   getAnnotation = \case
@@ -175,7 +166,6 @@ instance HasAnnotation A.Literal' where
     A.LiteralChar p _ -> p
     A.LiteralString p _ -> p
     A.LiteralInteger p _ -> p
-    A.LiteralDouble p _ -> p
     A.LiteralBoolean p _ -> p
 
 instance HasAnnotation A.StructExpressionField' where
