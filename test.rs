@@ -21,31 +21,19 @@ fn g() {
 	println!("{}", &x);
 }
 
-fn i() {
-	#[derive(Debug)]
+fn j() {
 	struct Foo {
-		x: i32
+		a: i32
 	}
-	
-	fn foo(a: Foo) {
-		println!("Do stuff {:?}", a);
-	}
-	
-	foo(Foo{
-		x: 5
-	});
-	
-	struct Foo {
-		y: i32
-	}
-	
-	let a: Foo {
-		y: 6
+	let mut x = Foo {a: 5};
+	let mut foo = || {
+		x.a += 2;
+		x.a
 	};
-	
-	println!("{}", a.y);
+	println!("{}", x.a);
+	println!("{}", foo());
 }
 
 fn main() {
-	i();
+	j();
 }

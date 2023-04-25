@@ -13,9 +13,6 @@ data Type =
     TReference ReferenceType
   deriving (Eq, Ord, Show, Read)
 
-data Mutable = Mutable | Const
-  deriving (Eq, Ord, Show, Read)
-
 data PrimitiveType =
     I32 |
     Char |
@@ -25,6 +22,18 @@ data PrimitiveType =
 
 stringType :: Type
 stringType = TArray $ Array (TPrimitive Char) UnSized
+
+i32Type :: Type
+i32Type = TPrimitive I32
+
+charType :: Type
+charType = TPrimitive Char
+
+boolType :: Type
+boolType = TPrimitive Bool
+
+unitType :: Type
+unitType = TPrimitive Unit
 
 isInteger :: Type -> Bool
 isInteger (TPrimitive I32) = True
@@ -57,11 +66,14 @@ data ArrayType = Array Type ArraySize
   deriving (Eq, Ord, Show, Read)
 
 data ArraySize =
-    Sized Integer |
+    Sized Int | -- TODO: change this to expression
     UnSized
   deriving (Eq, Ord, Show, Read)
 
 data ReferenceType = Reference Lifetime Mutable Type
+  deriving (Eq, Ord, Show, Read)
+
+data Mutable = Mutable | Const
   deriving (Eq, Ord, Show, Read)
 
 data Lifetime =

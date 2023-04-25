@@ -4,22 +4,19 @@ ItemStatement. Statement ::= Item ;
 ExpressionStatement. Statement ::= Expression ;
 separator Statement "" ;
 
-ItemFunction. Item ::= Function ;
-ItemStruct. Item ::= Struct ;
-ItemVariant. Item ::= Variant ;
+ItemFunction. Item ::= "fn" Ident "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
+ItemStruct. Item ::= "struct" Ident "{" [StructField] "}" ;
+ItemVariant. Item ::= "variant" Ident "{" [VariantSubtype] "}" ;
 ItemVariable. Item ::= CV Ident TypeDeclaration Initialization ";" ;
 
-Function. Function ::= "fn" Ident "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
 Parameter. FunctionParam ::= Ident ":" Type ;
 separator FunctionParam "," ;
 ReturnValue. FunctionReturnType ::= "->" Type ;
 ReturnUnit. FunctionReturnType ::= ;
 
-Struct. Struct ::= "struct" Ident "{" [StructField] "}" ;
 StructField. StructField ::= Ident ":" Type ;
 separator StructField "," ;
 
-Variant. Variant ::= "variant" Ident "{" [VariantSubtype] "}" ;
 VariantSubtype. VariantSubtype ::= Type ;
 separator VariantSubtype "," ;
 
@@ -31,9 +28,9 @@ UnInitialized. Initialization ::= ;
 Typed. TypeDeclaration ::= ":" Type ;
 Untyped. TypeDeclaration ::= ;
 
-TypeSimpleType. Type ::= TypeModifier SimpleType ;
-TypeArrayType. Type ::= TypeModifier ArrayType ;
-TypeFunctionType. Type ::= FunctionType ;
+TypeSimple. Type ::= TypeModifier Ident ;
+TypeArray. Type ::= TypeModifier ArrayType ;
+TypeFunction. Type ::= FunctionKind Lifetime "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
 
 None. TypeModifier ::= "" ; 
 Ref. TypeModifier ::= "&" Lifetime ;
@@ -41,10 +38,8 @@ MutRef. TypeModifier ::= "&" Lifetime "mut" ;
 ExplicitLifetime. Lifetime ::= "'" Ident ;
 ImplicitLifetime. Lifetime ::= ;
 
-SimpleType. SimpleType ::= Ident ;
 ArrayTypeSized. ArrayType ::= "[" Type ";" Expression1 "]" ;
 ArrayType. ArrayType ::= "[" Type "]" ;
-FunctionType. FunctionType ::= FunctionKind Lifetime "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
 Once. FunctionKind ::= "FnOnce" ;
 Normal. FunctionKind ::= "Fn" ;
 FunctionTypeParam. FunctionTypeParam ::= Type ;
@@ -94,8 +89,8 @@ DivideExpression. Expression11 ::= Expression11 "/" Expression12 ;
 ModuloExpression. Expression11 ::= Expression11 "%" Expression12 ;
 PlusExpression. Expression10 ::= Expression10 "+" Expression11 ;
 MinusExpression. Expression10 ::= Expression10 "-" Expression11 ;
-LShiftExpression. Expression8 ::= Expression9 "<<" Expression10 ;
-RShiftExpression. Expression8 ::= Expression9 ">>" Expression10 ;
+LShiftExpression. Expression9 ::= Expression9 "<<" Expression10 ;
+RShiftExpression. Expression9 ::= Expression9 ">>" Expression10 ;
 BitAndExpression. Expression8 ::= Expression8 "&" Expression9 ;
 BitXOrExpression. Expression7 ::= Expression7 "^" Expression8 ;
 BitOrExpression. Expression6 ::= Expression6 "|" Expression7 ;

@@ -4,23 +4,12 @@ import Control.Monad.State
 import Data.Maybe (isNothing, Maybe (..), fromJust, isJust)
 import Data.Map (Map, empty, fromList, insert, lookup)
 import Fe.Abs (Ident (..), BNFC'Position)
-import Common.Utils (Identifier, Identifier' (..))
+import Common.Utils
 import Common.Types
 import TypeCheck.Error
 import Prelude hiding (lookup)
-
-data Scope a =
-    Global a |
-    Local (Scope a) a
-  deriving (Eq, Ord, Show, Read)
-
-isGlobal :: Scope a -> Bool
-isGlobal (Global _) = True
-isGlobal (Local _ _) = False
-
-isLocal :: Scope a -> Bool
-isLocal (Global _) = False
-isLocal (Local _ _) = True
+import Common.Scope
+import Distribution.Fields.LexerMonad (LexState(warnings))
 
 data VariableState =
     Uninitialized |
@@ -29,7 +18,7 @@ data VariableState =
     Free
   deriving (Eq, Ord, Show, Read)
 
-data Variable = Variable Ident Type VariableState
+data Variable = Variable Identifier Type VariableState
   deriving (Eq, Ord, Show, Read)
 
 type VariableMappings = Map Ident VariableId
@@ -37,10 +26,10 @@ type TypeDefinitions = Map Ident Type
 type PreprocessorScope = Scope (VariableMappings, TypeDefinitions)
 
 type VariableId = Int
-data Allocator = Allocator [Variable] [VariableId]
+data Allocator = Allocator [Variable] [VariableId] VariableId
   deriving (Eq, Ord, Show, Read)
 
-data PreprocessorState = PreprocessorState PreprocessorScope Allocator
+data PreprocessorState = PreprocessorState PreprocessorScope Allocator [PreprocessorWarning]
   deriving (Eq, Ord, Show, Read)
 
 type PreprocessorMonad a = StateT PreprocessorState (Except PreprocessorError) a
@@ -55,12 +44,13 @@ makePreprocessorState = PreprocessorState
             (Ident "()", TPrimitive Unit),
             (Ident "String", TArray $ Array (TPrimitive Char) UnSized)
     ]))
-    (Allocator [] [])
+    (Allocator [] [] 0)
+    []
 
 getType :: Identifier -> PreprocessorMonad Type
 getType identifier = do
     let (Identifier p ident) = identifier
-    PreprocessorState scope _ <- get
+    PreprocessorState scope _ _ <- get
     let maybeType = helper ident scope
     when (isNothing maybeType) $ do throwError $ TypeNotDefined identifier
     return $ fromJust maybeType
@@ -78,23 +68,25 @@ getTypeLocal (Identifier _ ident) (Local _ (_, types)) = lookup ident types
 addType :: Identifier -> Type -> PreprocessorMonad ()
 addType identifier t = do
     let (Identifier _ ident) = identifier
-    PreprocessorState scope allocator <- get
+    PreprocessorState scope allocator warnings <- get
     let maybeDefinition = getTypeLocal identifier scope
     when (isJust maybeDefinition) $ do throwError $ TypeAlreadyInScope identifier t (fromJust maybeDefinition)
     put $ PreprocessorState
         (helper ident t scope)
         allocator
+        warnings
   where
     helper ident t (Global (variables, types)) = Global (variables, insert ident t types)
     helper ident t (Local parent (variables, types)) = Local parent (variables, insert ident t types)
 
-getVariable :: Identifier -> PreprocessorMonad Variable
+getVariable :: Identifier -> PreprocessorMonad (VariableId, Variable)
 getVariable identifier = do
     let (Identifier _ ident) = identifier
-    PreprocessorState scope (Allocator variableStack _) <- get
+    PreprocessorState scope (Allocator variableStack _ _) _ <- get
     let maybeId = helper ident scope
     when (isNothing maybeId) $ do throwError $ VariableNotDefined identifier
-    return $ variableStack !! fromJust maybeId
+    let id = fromJust maybeId
+    return (id, listGet id variableStack)
   where
     helper ident (Global (variables, _)) = lookup ident variables
     helper ident (Local parent (variables, _)) =
@@ -102,30 +94,50 @@ getVariable identifier = do
         if isNothing x then helper ident parent
         else x
 
-addVariable :: Identifier -> Variable -> PreprocessorMonad ()
+tryGetVariableLocal :: Identifier -> PreprocessorMonad (Maybe (VariableId, Variable))
+tryGetVariableLocal identifier = do
+    PreprocessorState scope (Allocator variableStack _ _) _ <- get
+    return $ do
+        id <- helper identifier scope
+        return (id, listGet id variableStack)
+  where
+    helper (Identifier _ ident) (Global (variables, _)) = lookup ident variables
+    helper (Identifier _ ident) (Local _ (variables, _)) = lookup ident variables
+
+addVariable :: Identifier -> Variable -> PreprocessorMonad VariableId
 addVariable identifier variable = do
     let (Identifier _ ident) = identifier
-    PreprocessorState scope allocator <- get
+    PreprocessorState scope allocator warnings <- get
     let (id, allocator') = allocate allocator variable
     put $ PreprocessorState
         (helper ident id scope)
         allocator'
+        warnings
+    return id
   where
     helper ident id (Global (variables, types)) = Global (insert ident id variables, types)
     helper ident id (Local parent (variables, types)) = Local parent (insert ident id variables, types)
 
-
 allocate :: Allocator -> Variable -> (VariableId, Allocator)
-allocate (Allocator variableStack freeCells) variable =
+allocate (Allocator variableStack freeCells maxStackSize) variable =
+    let l = length variableStack in
     case freeCells of
-        [] -> (length variableStack, Allocator (variableStack++[variable]) [])
+        [] ->
+            (l, Allocator (listPushBack variable variableStack) [] (max maxStackSize (l + 1)))
         (h:t) ->
-            let (pref, _:suf) = splitAt h variableStack in
-            (h, Allocator (pref++(variable:suf)) t)
+            (h, Allocator (listSet h variable variableStack) t maxStackSize)
 
-free :: Allocator -> VariableId -> Allocator
-free (Allocator variableStack freeCells) id =
-    if length variableStack == id then
-        Allocator (take (id - 1) variableStack) freeCells
-    else
-        Allocator variableStack (id:freeCells)
+free :: VariableId -> PreprocessorMonad ()
+free id = do
+    PreprocessorState scope (Allocator variableStack freeCells maxStackSize) warnings <- get
+    let allocator =
+            if length variableStack == id then
+                Allocator (take (id - 1) variableStack) freeCells maxStackSize
+            else
+                Allocator variableStack (id:freeCells) maxStackSize
+    put $ PreprocessorState scope allocator warnings
+
+addWarning :: PreprocessorWarning -> PreprocessorMonad ()
+addWarning warning = do
+    PreprocessorState scope allocator warnings <- get
+    put $ PreprocessorState scope allocator (warning:warnings)

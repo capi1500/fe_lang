@@ -1,8 +1,7 @@
-fn fiz(a: i32) -> bool {
-	fn fiz(b: bool, c: i32, d: char) -> i32 {
+fn foo() -> i32 {
+	fn fiz(a: i32) -> bool {
+		true
 	}
-}
-
-fn foo() {
-	
+	var x = 7;
+	5 + x * 3 
 }
