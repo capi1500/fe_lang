@@ -46,8 +46,10 @@ instance TypeCheck A.Code Code where
     typeCheck :: A.Code -> PreprocessorMonad Code
     typeCheck (A.Code p statements) = do -- TODO: add checking for main function
         traverse_ initializeGlobalScope statements
+        (mainId, _) <- getVariable mainFunction
+        PreprocessorState scope allocator warnings _ <- get
+        put $ PreprocessorState scope allocator warnings mainId
         statements' <- traverse typeCheck statements
-        get
         return $ Code statements'
 
 initializeGlobalScope :: A.Statement -> PreprocessorMonad ()
@@ -78,7 +80,7 @@ addToScope (A.ItemStruct p ident fields) = do
 addToScope (A.ItemVariant p ident types) = do
     throwError $ Other "Not yet implemented" p
 addToScope (A.ItemVariable p cv ident typeDeclaration initialization) = do
-    PreprocessorState scope _ _ <- get
+    PreprocessorState scope _ _ _ <- get
     when (isGlobal scope && isVariable cv) (do throwError $ VariableAtGlobalScope (Identifier p ident))
 
     -- typeCheck (A.ItemVariable p cv ident typeDeclaration initialization) :: PreprocessorMonad Statement
@@ -111,7 +113,7 @@ instance TypeCheck A.Item Statement where
     free id
     id <- addVariable identifier f
 
-    return $ NewVariableStatement identifier id actualType (VarInitialized expression')
+    return $ NewFunctionStatement identifier id expression'
 
   typeCheck (A.ItemStruct p ident fields) = do
     throwError $ Other "Not yet implemented" p
@@ -143,7 +145,7 @@ instance TypeCheck A.Item Statement where
             t
             variableState
     id <- addVariable identifier v
-    return $ NewVariableStatement identifier id t initialization'
+    return $ NewVariableStatement identifier id initialization'
 
 
 -- instance TypeCheck A.Function' where

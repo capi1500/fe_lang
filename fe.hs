@@ -13,6 +13,7 @@ import Fe.Skel  ()
 
 import Common.Annotation
 import Common.Ast
+import Common.Utils
 
 import TypeCheck.TypeCheck (typeCheck)
 import TypeCheck.Error (PreprocessorError)
@@ -59,13 +60,14 @@ parse p s =
     ts = myLexer s
     showPosToken ((l,c),t) = concat [ show l, ":", show c, "\t", show t ]
 
+type PreprocessorOutput = (Code, Int, VariableId)
 
-typeCheckStage :: A.Code -> IO (Code, Int)
+typeCheckStage :: A.Code -> IO PreprocessorOutput
 typeCheckStage code =
     let err = runExcept $ runStateT (typeCheck code) makePreprocessorState in
     handleTypeCheckError err
 
-handleTypeCheckError :: Either PreprocessorError (Code, PreprocessorState) -> IO (Code, Int)
+handleTypeCheckError :: Either PreprocessorError (Code, PreprocessorState) -> IO PreprocessorOutput
 handleTypeCheckError (Left err) = do
     putStrLn "Error in type checker"
     print err
@@ -73,13 +75,13 @@ handleTypeCheckError (Left err) = do
 handleTypeCheckError (Right (ast, state)) = do
     putStrLn "\n"
     print state
-    let PreprocessorState _ (Allocator _ _ stackSize) _ = state
-    return (ast, stackSize)
+    let PreprocessorState _ (Allocator _ _ stackSize) _ mainId = state
+    return (ast, stackSize, mainId)
 
 
-executeStage :: (Code, Int) -> IO ()
-executeStage (code, stackSize) = do
-    out <- runExceptT $ runStateT (execute code) (makeExecutionState stackSize)
+executeStage :: PreprocessorOutput -> IO ()
+executeStage (code, stackSize, mainId) = do
+    out <- runExceptT $ runStateT (execute code) (makeExecutionState stackSize mainId)
     handleExecutionError out
 
 

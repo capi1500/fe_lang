@@ -6,6 +6,8 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.Maybe (isNothing)
 
+type VariableId = Int
+
 getItemIdent :: A.Item' a -> A.Ident
 getItemIdent (A.ItemFunction _ ident _ _ _) = ident
 getItemIdent (A.ItemStruct _ ident _) = ident

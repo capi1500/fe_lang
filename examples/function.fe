@@ -1,4 +1,4 @@
-fn foo() -> i32 {
+fn main() -> i32 {
 	fn fiz(a: i32) -> bool {
 		true
 	}

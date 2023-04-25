@@ -38,13 +38,13 @@ modifyType (A.MutRef p lifetime) t = TReference $ Reference Static Mutable t -- 
 
 inNewScope :: PreprocessorMonad a -> PreprocessorMonad a
 inNewScope f = do
-    PreprocessorState scope allocator warnings <- get -- record current state
+    PreprocessorState scope allocator warnings mainId <- get -- record current state
     let Allocator variableStack freeCells _ = allocator
     let innerScope = Local scope (empty, empty)
-    put $ PreprocessorState innerScope allocator warnings
+    put $ PreprocessorState innerScope allocator warnings mainId
     ret' <- f
-    PreprocessorState _ (Allocator _ _ maxSize) warnings' <- get
-    put $ PreprocessorState scope (Allocator variableStack freeCells maxSize) warnings' -- reproduce with keeping warnings and updating max stack size
+    PreprocessorState _ (Allocator _ _ maxSize) warnings' _ <- get
+    put $ PreprocessorState scope (Allocator variableStack freeCells maxSize) warnings' mainId -- reproduce with keeping warnings and updating max stack size
     return ret'
 
 typeOfBlock :: [Statement] -> Type

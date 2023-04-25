@@ -3,10 +3,13 @@
 module Common.Ast where
 
 import Common.Types
-import TypeCheck.State (Variable, VariableId)
-import Common.Utils (Identifier)
-import Fe.Abs (Ident)
+import TypeCheck.State (Variable)
+import Common.Utils
+import Fe.Abs (Ident (..))
 import Data.Map (Map)
+
+mainFunction :: Identifier
+mainFunction = Identifier Nothing (Ident "main")
 
 newtype Code = Code [Statement]
   deriving (Eq, Ord, Show, Read)
@@ -14,7 +17,8 @@ newtype Code = Code [Statement]
 data Statement =
     EmptyStatement |
     TypeStatement Type |
-    NewVariableStatement Identifier VariableId Type Initialization |
+    NewVariableStatement Identifier VariableId Initialization |
+    NewFunctionStatement Identifier VariableId Expression |
     ExpressionStatement TypedExpression
   deriving (Eq, Ord, Show, Read)
 
@@ -74,7 +78,7 @@ data Value =
     VUnit |
     VStruct (Map Ident Value) |
     VVariant VariableId Value | -- value_tag, value
-    VFunction [Variable] Expression | -- captures, code
+    VFunction Expression | -- captures, code
     VArray Int [Value] | -- size, values
     VReference Ident
   deriving (Eq, Ord, Show, Read)

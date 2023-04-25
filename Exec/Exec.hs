@@ -13,6 +13,7 @@ import Data.Bits
 import Control.Monad (when)
 import Exec.Utils
 import Data.Maybe
+import Control.Monad.State (get)
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -20,8 +21,19 @@ class Executable a b where
 instance Executable Code () where
     execute :: Code -> ExecutorMonad ()
     execute (Code statements) = do -- TODO: change to initialize global scope and execute main function
-        traverse execute statements :: ExecutorMonad [Value]
+        traverse initializeGlobalScope statements :: ExecutorMonad [()]
+        ExecutionState _ mainId <- get
+        Variable _ maybeMain <- getVariable mainId
+        let VFunction code = fromJust maybeMain
+        x <- execute code :: ExecutorMonad Value
+        liftIO $ print x
         return ()
+
+initializeGlobalScope :: Statement -> ExecutorMonad ()
+initializeGlobalScope (ExpressionStatement _) = do return ()
+initializeGlobalScope s = do
+    execute s :: ExecutorMonad Value
+    return ()
 
 instance Executable Statement Value where
     execute :: Statement -> ExecutorMonad Value
@@ -29,14 +41,16 @@ instance Executable Statement Value where
         return VUnit
     execute (TypeStatement t) = do
         throwError $ Other "Not yet implemented"
-    execute (NewVariableStatement identifier id _ initialization) = do
+    execute (NewVariableStatement identifier id initialization) = do
         value <- execute initialization
         addVariable id (Variable identifier value)
         return VUnit
+    execute (NewFunctionStatement identifier id expression) = do
+        let value = VFunction expression
+        addVariable id (Variable identifier (Just value))
+        return VUnit
     execute (ExpressionStatement (TypedExpression expression _)) = do
-        x <- execute expression :: ExecutorMonad Value
-        liftIO $ print x
-        return x
+        execute expression
 
 instance Executable Initialization (Maybe Value) where
     execute :: Initialization -> ExecutorMonad (Maybe Value)

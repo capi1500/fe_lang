@@ -12,24 +12,23 @@ import TypeCheck.State (getVariable)
 
 data Variable = Variable Identifier (Maybe Value) | VariableUndefined
   deriving (Eq, Ord, Show, Read)
-type VariableId = Int
 
-newtype ExecutionState = ExecutionState [Variable]
+data ExecutionState = ExecutionState [Variable] VariableId
   deriving (Eq, Ord, Show, Read)
 
 type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
 
--- makeExecutionState :: ExecutionState
+makeExecutionState :: Int -> VariableId -> ExecutionState
 makeExecutionState stackSize = ExecutionState
         [VariableUndefined | i <- [0..stackSize]]
 
 addVariable :: VariableId -> Variable -> ExecutorMonad ()
 addVariable id variable = do
-    ExecutionState stack <- get
-    put $ ExecutionState (listSet id variable stack)
+    ExecutionState stack mainId <- get
+    put $ ExecutionState (listSet id variable stack) mainId
     return ()
 
 getVariable :: VariableId -> ExecutorMonad Variable
 getVariable id = do
-    ExecutionState stack <- get
+    ExecutionState stack mainId <- get
     return $ listGet id stack
