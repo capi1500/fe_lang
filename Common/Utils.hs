@@ -5,18 +5,14 @@ import Data.Map (Map, lookup, empty)
 import Control.Monad.State
 import Control.Monad.Except
 import Data.Maybe (isNothing)
-
-type VariableId = Int
-
-getItemIdent :: A.Item' a -> A.Ident
-getItemIdent (A.ItemFunction _ ident _ _ _) = ident
-getItemIdent (A.ItemStruct _ ident _) = ident
-getItemIdent (A.ItemVariant _ ident _) = ident
-getItemIdent (A.ItemVariable _ _ ident _ _) = ident
+import Common.Printer
 
 type Identifier = Identifier' A.BNFC'Position
 data Identifier' a = Identifier a A.Ident
   deriving (Eq, Ord, Show, Read)
+
+instance CodePrint (Identifier' a) where
+    codePrint _ (Identifier _ (A.Ident ident)) = ident
 
 listSet :: Int -> a -> [a] -> [a]
 listSet id value list =

@@ -1,0 +1,6 @@
+fn main() {
+	var x = 5;
+	var y = &mut x;
+	y;
+//	var z = &mut x;
+}

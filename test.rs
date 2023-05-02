@@ -21,6 +21,22 @@ fn g() {
 	println!("{}", &x);
 }
 
+struct Foo<'a, 'b> {
+	x: &'a i32,
+	y: &'b i32,
+}
+
+fn i_helper<'a, 'b>(x: &'a i32, y: &'b i32) -> Foo<'a, 'b> {
+	Foo { x: y, y: x }
+}
+
+fn i() {
+	let x = 5;
+	let y = 4;
+	let foo = i_helper(&x, &y);
+	println!("{} {}", foo.x, foo.y);
+}
+
 fn j() {
 	struct Foo {
 		a: i32
@@ -30,10 +46,9 @@ fn j() {
 		x.a += 2;
 		x.a
 	};
-	println!("{}", x.a);
 	println!("{}", foo());
 }
 
 fn main() {
-	j();
+	i();
 }

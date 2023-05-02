@@ -1,0 +1,12 @@
+- Dodać explicit lifetime annotations
+	są tak w ogóle 2 różne lifetime-y
+	1. annotated - które mają pozwolić type checkerowi się ogarnąć
+	2. "normal" - prawdziwe, typecheckowane, lifetime-y
+	Wartości mają prawdziwe lifetime
+	Typy mają annotated lifetime
+
+Skrócić czas życia zmiennych z od deklaracji do końca bloku, na od deklaracji do ostatniego użycia:
+- przed type checkiem, przejście po całym kodzie i zapisanie, gdzie zmienne:
+	- są moved out
+	- pierwsze miejsce od ostatniego wykorzystania zmiennej, gdzie zmienna nie ma już żadnych referencji ani mutowalnych referencji
+- można z tego wyznaczyć gdzie zmienne są usuwane

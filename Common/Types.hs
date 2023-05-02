@@ -1,7 +1,7 @@
 module Common.Types where
 
 import Fe.Abs (Ident, BNFC'Position)
-import Common.Utils (Identifier)
+import Common.Utils
 
 data Type =
     TUntyped |
@@ -9,8 +9,8 @@ data Type =
     TStruct StructType |
     TVariant VariantType |
     TFunction FunctionType |
-    TArray ArrayType |
-    TReference ReferenceType
+    TArray Type |
+    TReference Mutable Type
   deriving (Eq, Ord, Show, Read)
 
 data PrimitiveType =
@@ -21,7 +21,10 @@ data PrimitiveType =
   deriving (Eq, Ord, Show, Read)
 
 stringType :: Type
-stringType = TArray $ Array (TPrimitive Char) UnSized
+stringType = arrayType charType
+
+arrayType :: Type -> Type
+arrayType = TArray
 
 i32Type :: Type
 i32Type = TPrimitive I32
@@ -39,6 +42,49 @@ isInteger :: Type -> Bool
 isInteger (TPrimitive I32) = True
 isInteger _ = False
 
+isPrimitive :: Type -> Bool
+isPrimitive (TPrimitive _) = True
+isPrimitive _ = False
+
+isStruct :: Type -> Bool
+isStruct (TStruct _) = True
+isStruct _ = False
+
+isVariant :: Type -> Bool
+isVariant (TVariant _) = True
+isVariant _ = False
+
+isArray :: Type -> Bool
+isArray (TArray _) = True
+isArray _ = False
+
+isFunction :: Type -> Bool
+isFunction (TFunction _) = True
+isFunction _ = False
+
+isNamedFunction :: Type -> Bool
+isNamedFunction (TFunction (Function (NamedFunction _) _ _ _)) = True
+isNamedFunction _ = False
+
+isClosure :: Type -> Bool
+isClosure (TFunction (Function Unnamed _ _ _)) = True
+isClosure _ = False
+
+isReference :: Type -> Bool
+isReference (TReference _ _) = True
+isReference _ = False
+
+isConstReference :: Type -> Bool
+isConstReference (TReference Const _) = True
+isConstReference _ = False
+
+isMutReference :: Type -> Bool
+isMutReference (TReference Mutable _) = True
+isMutReference _ = False
+
+isMoveableOnVariableExpression :: Type -> Bool
+isMoveableOnVariableExpression t = isStruct t || isVariant t || isArray t || isReference t
+
 -- name, defined_at, [(field name, field type)]
 data StructType = Struct Identifier [Field]
   deriving (Eq, Ord, Show, Read)
@@ -51,10 +97,13 @@ data VariantType = Variant Identifier [Type]
   deriving (Eq, Ord, Show, Read)
 
 -- defined_at, function_kind, [params], return_type
-data FunctionType = Function FunctionName FunctionKind Lifetime [Type] Type
+data FunctionType = Function FunctionName FunctionKind [FunctionParam] Type
   deriving (Eq, Ord, Show, Read)
 
 data FunctionName = NamedFunction Identifier | Unnamed
+  deriving (Eq, Ord, Show, Read)
+
+data FunctionParam = FunctionParam Identifier Type
   deriving (Eq, Ord, Show, Read)
 
 data FunctionKind =
@@ -62,24 +111,5 @@ data FunctionKind =
     FnOnce
   deriving (Eq, Ord, Show, Read)
 
-data ArrayType = Array Type ArraySize
-  deriving (Eq, Ord, Show, Read)
-
-data ArraySize =
-    Sized Int | -- TODO: change this to expression
-    UnSized
-  deriving (Eq, Ord, Show, Read)
-
-data ReferenceType = Reference Lifetime Mutable Type
-  deriving (Eq, Ord, Show, Read)
-
 data Mutable = Mutable | Const
-  deriving (Eq, Ord, Show, Read)
-
-data Lifetime =
-    Static |
-    Scoped LifetimeName BNFC'Position Lifetime -- name, scope_begin, parent
-  deriving (Eq, Ord, Show, Read)
-
-data LifetimeName = Implicit | Explicit Ident
   deriving (Eq, Ord, Show, Read)

@@ -4,10 +4,16 @@ ItemStatement. Statement ::= Item ;
 ExpressionStatement. Statement ::= Expression ;
 separator Statement "" ;
 
-ItemFunction. Item ::= "fn" Ident "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
-ItemStruct. Item ::= "struct" Ident "{" [StructField] "}" ;
-ItemVariant. Item ::= "variant" Ident "{" [VariantSubtype] "}" ;
+ItemFunction. Item ::= "fn" Ident ItemLifetimeAnnotation  "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
+ItemStruct. Item ::= "struct" Ident ItemLifetimeAnnotation "{" [StructField] "}" ;
+ItemVariant. Item ::= "variant" Ident ItemLifetimeAnnotation "{" [VariantSubtype] "}" ;
 ItemVariable. Item ::= CV Ident TypeDeclaration Initialization ";" ;
+
+ItemLifetimeDefinitions. ItemLifetimeAnnotation ::= "<" [LifetimeDefinition] ">" ;
+ItemLifetimeDefinitionsEmpty. ItemLifetimeAnnotation ::= ;
+
+LifetimeDefinition. LifetimeDefinition ::= "'" Ident ;
+separator LifetimeDefinition "," ;
 
 Parameter. FunctionParam ::= Ident ":" Type ;
 separator FunctionParam "," ;
@@ -35,10 +41,9 @@ TypeFunction. Type ::= FunctionKind Lifetime "(" [FunctionTypeParam] ")" Functio
 None. TypeModifier ::= "" ; 
 Ref. TypeModifier ::= "&" Lifetime ;
 MutRef. TypeModifier ::= "&" Lifetime "mut" ;
-ExplicitLifetime. Lifetime ::= "'" Ident ;
+ExplicitLifetime. Lifetime ::= LifetimeDefinition ;
 ImplicitLifetime. Lifetime ::= ;
 
-ArrayTypeSized. ArrayType ::= "[" Type ";" Expression1 "]" ;
 ArrayType. ArrayType ::= "[" Type "]" ;
 Once. FunctionKind ::= "FnOnce" ;
 Normal. FunctionKind ::= "Fn" ;

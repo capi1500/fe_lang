@@ -1,7 +1,15 @@
-fn main() -> i32 {
-	fn fiz(a: i32) -> bool {
-		true
+fn fib(first: i32, second: i32, cur: i32, max: i32) -> i32 {
+	if (cur < max) {
+		fib(second, first + second, cur + 1, max)
+	} else {
+		first
 	}
-	var x = 7;
-	5 + x * 3 
+}
+
+fn getNthFib(n: i32) -> i32 {
+	fib(0, 1, 0, n + 1)
+}
+
+fn main() -> i32 {
+	getNthFib(4)
 }

@@ -17,11 +17,14 @@ import Common.Utils
 
 import TypeCheck.TypeCheck (typeCheck)
 import TypeCheck.Error (PreprocessorError)
-import TypeCheck.State (PreprocessorState (PreprocessorState), makePreprocessorState, Allocator (Allocator))
+import TypeCheck.State (PreprocessorState (PreprocessorState), makePreprocessorState)
 
 import Exec.Exec
 import Exec.State
 import Exec.Error
+import Common.Printer
+import Common.AstPrinter
+import Data.List (intercalate)
 
 type ParseFun a = [Token] -> Either String a
 
@@ -49,18 +52,18 @@ parse p s =
         putStrLn err
         exitFailure
     Right tree -> do
-        putStrLn "\nParsed tree\n"
-        print tree
+        -- putStrLn "\nParsed tree\n"
+        -- print tree
         ast <- typeCheckStage tree
-        putStrLn "\nTypechecked ast\n"
-        print ast
+        putStrLn "\nTypeChecked ast\n"
+        putStrLn (codePrint 0 ast)
         executeStage ast
         return ()
     where
     ts = myLexer s
     showPosToken ((l,c),t) = concat [ show l, ":", show c, "\t", show t ]
 
-type PreprocessorOutput = (Code, Int, VariableId)
+type PreprocessorOutput = Code
 
 typeCheckStage :: A.Code -> IO PreprocessorOutput
 typeCheckStage code =
@@ -73,17 +76,17 @@ handleTypeCheckError (Left err) = do
     print err
     exitFailure
 handleTypeCheckError (Right (ast, state)) = do
-    putStrLn "\n"
-    print state
-    let PreprocessorState _ (Allocator _ _ stackSize) _ mainId = state
-    return (ast, stackSize, mainId)
+    let PreprocessorState _ _ _ warnings _ = state
+    putStrLn "Warnings:"
+    putStrLn $ intercalate "\n" (fmap (codePrint 0) (reverse warnings))
+    return ast
 
 
 executeStage :: PreprocessorOutput -> IO ()
-executeStage (code, stackSize, mainId) = do
-    out <- runExceptT $ runStateT (execute code) (makeExecutionState stackSize mainId)
-    handleExecutionError out
-
+executeStage code = do
+    -- out <- runExceptT $ runStateT (execute code) (makeExecutionState stackSize mainId)
+    -- handleExecutionError out
+    return ()
 
 handleExecutionError :: Either ExecutionError ((), ExecutionState) -> IO ()
 handleExecutionError (Left err) = do

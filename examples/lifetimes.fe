@@ -1,0 +1,31 @@
+fn main() -> i32 {
+	var x = 5;
+	const y = &x; 		// x borrowed
+	{
+		
+	}
+	print(*y); 		    // x borrow ended
+	// (*y + (x += 4)); illegal, mutating x while y holds borrow of x
+	x += 4; 			// x can be mutated here
+}
+
+/*
+For each identifier determine where it is first and last used (by statements and blocks I guess)
+*/
+
+CallFunction {
+	Parameters = [
+		Param {
+			BorrowExpression {
+				Addition {
+					VariableExpression {
+						value: x
+					}
+					LiteralExpression {
+						value: 2
+					}
+				}
+			}
+		}
+	]
+}

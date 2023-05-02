@@ -1,18 +1,24 @@
 module TypeCheck.Utils where
 
-import qualified Fe.Abs as A
+import Data.Map ( empty, insert, fromList, lookup, Map )
+import Data.Maybe (isNothing, isJust, fromJust)
 import Control.Monad.Except
 import Control.Monad.State
+
+import qualified Fe.Abs as A
+
 import Common.Ast
 import Common.Types
-import Data.Map ( empty, insert, fromList, lookup, Map )
-import Data.Maybe (isNothing, isJust)
-import Fe.Abs (Ident)
-import TypeCheck.State
-import TypeCheck.Error
-import Common.Utils (Identifier, Identifier' (Identifier))
+import Common.Utils
 import Common.Annotation
 import Common.Scope
+
+import Fe.Abs (Ident)
+
+import TypeCheck.State hiding (Static)
+import TypeCheck.Error
+import TypeCheck.Variable
+import TypeCheck.StateFunctions
 
 getAnnotatedType :: HasAnnotation a => a Annotation -> Type
 getAnnotatedType x =
@@ -31,31 +37,6 @@ assertType actualType expectedType p = do
     when (expectedType /= actualType) $
         throwError $ TypeMismatch p actualType expectedType
 
-modifyType :: A.TypeModifier -> Type -> Type
-modifyType (A.None p) t = t
-modifyType (A.Ref p lifetime) t = TReference $ Reference Static Const t -- TODO: deal with lifetimes
-modifyType (A.MutRef p lifetime) t = TReference $ Reference Static Mutable t -- TODO: deal with lifetimes
-
-inNewScope :: PreprocessorMonad a -> PreprocessorMonad a
-inNewScope f = do
-    PreprocessorState scope allocator warnings mainId <- get -- record current state
-    let Allocator variableStack freeCells _ = allocator
-    let innerScope = Local scope (empty, empty)
-    put $ PreprocessorState innerScope allocator warnings mainId
-    ret' <- f
-    PreprocessorState _ (Allocator _ _ maxSize) warnings' _ <- get
-    put $ PreprocessorState scope (Allocator variableStack freeCells maxSize) warnings' mainId -- reproduce with keeping warnings and updating max stack size
-    return ret'
-
-typeOfBlock :: [Statement] -> Type
-typeOfBlock statements =
-    if null statements then
-        TPrimitive Unit
-    else
-        case last statements of
-        ExpressionStatement (TypedExpression _ t) -> t
-        _ -> TPrimitive Unit
-
 isVariable :: A.CV -> Bool
 isVariable (A.Const _) = False
 isVariable (A.Var _) = True
@@ -71,3 +52,43 @@ isUnInitialized (A.UnInitialized _) = True
 isInitialized :: A.Initialization -> Bool
 isInitialized (A.Initialized _ _) = True
 isInitialized (A.UnInitialized _) = False
+
+-- TODO: deal with annotated lifetimes
+modifyType :: Type -> A.TypeModifier -> PreprocessorMonad Type
+modifyType t (A.None _) = do return t
+modifyType t (A.Ref _ lifetime) = do
+    lifetime' <- castLifetime lifetime
+    return $ TReference Const t
+modifyType t (A.MutRef _ lifetime) = do
+    lifetime' <- castLifetime lifetime
+    return $ TReference Mutable t
+
+castLifetime :: A.Lifetime -> PreprocessorMonad Lifetime
+castLifetime (A.ExplicitLifetime p ident) = do
+    throwError $ Other "Not yet implemented" p
+castLifetime (A.ImplicitLifetime _) = do
+    LifetimeState lifetime _ <- gets lifetimeState
+    return lifetime
+
+-- getItemIdent :: A.Item' a -> A.Ident
+-- getItemIdent (A.ItemFunction _ ident _ _ _) = ident
+-- getItemIdent (A.ItemStruct _ ident _) = ident
+-- getItemIdent (A.ItemVariant _ ident _) = ident
+-- getItemIdent (A.ItemVariable _ _ ident _ _) = ident
+
+getShortestLifetimeOfUsedVariables :: A.BNFC'Position -> PreprocessorMonad Lifetime
+getShortestLifetimeOfUsedVariables p = do
+    usedVariables <- gets usedVariables
+    when (null usedVariables) $ throwError (CannotMakeEmptyReference p)
+    lifetimes <- traverse (\id -> do
+        variable <- getVariableById id
+        return $ lifetime variable) usedVariables
+    let head:tail = lifetimes
+    foldM (\first second -> do
+        if isSubLifetime first second then
+            return second
+        else if isSubLifetime second first then
+            return first
+        else
+            throwError $ LifetimesMismatch first second
+        ) head tail
