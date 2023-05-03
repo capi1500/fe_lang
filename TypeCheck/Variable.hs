@@ -51,3 +51,20 @@ instance CodePrint Variable where
     printTabs (tabs + 1) ++ "borrowsMut: " ++ codePrint tabs borrowsMut ++ "\n" ++
     printTabs (tabs + 1) ++ "lifetime: " ++ codePrint tabs list ++ "\n" ++
     printTabs tabs ++ "}"
+
+
+setVariableState :: VariableState -> Variable -> Variable
+setVariableState variableState (Variable variableIdentifier variableType _ borrows borrowsMut lifetime) =
+    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+
+setVariableBorrows :: [VariableId] -> Variable -> Variable
+setVariableBorrows borrows (Variable variableIdentifier variableType variableState _ borrowsMut lifetime) =
+    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+
+setVariableBorrowsMut :: [VariableId] -> Variable -> Variable
+setVariableBorrowsMut borrowsMut (Variable variableIdentifier variableType variableState borrows _ lifetime) =
+    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+
+changeVariable :: VariableState -> [VariableId] -> [VariableId] -> Variable -> Variable
+changeVariable variableState borrows borrowsMut (Variable variableIdentifier variableType _ _ _ lifetime) =
+    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime

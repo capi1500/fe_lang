@@ -6,9 +6,9 @@ import Common.Utils
 data Type =
     TUntyped |
     TPrimitive PrimitiveType |
-    TStruct StructType |
-    TVariant VariantType |
-    TFunction FunctionType |
+    TStruct Identifier [Field] |
+    TVariant Identifier [Type] |
+    TFunction FunctionName FunctionKind [FunctionParam] Type |
     TArray Type |
     TReference Mutable Type
   deriving (Eq, Ord, Show, Read)
@@ -47,11 +47,11 @@ isPrimitive (TPrimitive _) = True
 isPrimitive _ = False
 
 isStruct :: Type -> Bool
-isStruct (TStruct _) = True
+isStruct (TStruct _ _) = True
 isStruct _ = False
 
 isVariant :: Type -> Bool
-isVariant (TVariant _) = True
+isVariant (TVariant _ _) = True
 isVariant _ = False
 
 isArray :: Type -> Bool
@@ -59,16 +59,20 @@ isArray (TArray _) = True
 isArray _ = False
 
 isFunction :: Type -> Bool
-isFunction (TFunction _) = True
+isFunction TFunction {} = True
 isFunction _ = False
 
 isNamedFunction :: Type -> Bool
-isNamedFunction (TFunction (Function (NamedFunction _) _ _ _)) = True
+isNamedFunction (TFunction (NamedFunction _) _ _ _) = True
 isNamedFunction _ = False
 
 isClosure :: Type -> Bool
-isClosure (TFunction (Function Unnamed _ _ _)) = True
+isClosure (TFunction Unnamed _ _ _) = True
 isClosure _ = False
+
+isOnceFunction :: Type -> Bool
+isOnceFunction (TFunction _ FnOnce _ _) = True
+isOnceFunction _ = False
 
 isReference :: Type -> Bool
 isReference (TReference _ _) = True
@@ -85,26 +89,22 @@ isMutReference _ = False
 isMoveableOnVariableExpression :: Type -> Bool
 isMoveableOnVariableExpression t = isStruct t || isVariant t || isArray t || isReference t
 
--- name, defined_at, [(field name, field type)]
-data StructType = Struct Identifier [Field]
-  deriving (Eq, Ord, Show, Read)
+getStricterOfFunctionKinds :: FunctionKind -> FunctionKind -> FunctionKind
+getStricterOfFunctionKinds FnOnce _ = FnOnce
+getStricterOfFunctionKinds _ FnOnce = FnOnce
+getStricterOfFunctionKinds Fn Fn = Fn
 
 data Field = Field Identifier Type
-  deriving (Eq, Ord, Show, Read)
-
--- name, defined_at
-data VariantType = Variant Identifier [Type]
-  deriving (Eq, Ord, Show, Read)
-
--- defined_at, function_kind, [params], return_type
-data FunctionType = Function FunctionName FunctionKind [FunctionParam] Type
   deriving (Eq, Ord, Show, Read)
 
 data FunctionName = NamedFunction Identifier | Unnamed
   deriving (Eq, Ord, Show, Read)
 
 data FunctionParam = FunctionParam Identifier Type
-  deriving (Eq, Ord, Show, Read)
+  deriving (Ord, Show, Read)
+
+instance Eq FunctionParam where
+  (==) (FunctionParam _ t1) (FunctionParam _ t2) = t1 == t2
 
 data FunctionKind =
     Fn |

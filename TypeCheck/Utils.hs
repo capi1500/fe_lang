@@ -10,7 +10,6 @@ import qualified Fe.Abs as A
 import Common.Ast
 import Common.Types
 import Common.Utils
-import Common.Annotation
 import Common.Scope
 
 import Fe.Abs (Ident)
@@ -20,22 +19,10 @@ import TypeCheck.Error
 import TypeCheck.Variable
 import TypeCheck.StateFunctions
 
-getAnnotatedType :: HasAnnotation a => a Annotation -> Type
-getAnnotatedType x =
-    case getAnnotation x of
-        Typed _ t -> t
-        Position _ -> TUntyped
-
-repositionAnnotation :: HasAnnotation a => a Annotation -> A.BNFC'Position -> Annotation
-repositionAnnotation x p =
-    case getAnnotation x of
-        Typed _ t -> Typed p t
-        Position _ -> Position p
-
 assertType :: Type -> Type -> A.BNFC'Position -> PreprocessorMonad ()
 assertType actualType expectedType p = do
     when (expectedType /= actualType) $
-        throwError $ TypeMismatch p actualType expectedType
+        throw $ TypeMismatch p actualType expectedType
 
 isVariable :: A.CV -> Bool
 isVariable (A.Const _) = False
@@ -65,30 +52,50 @@ modifyType t (A.MutRef _ lifetime) = do
 
 castLifetime :: A.Lifetime -> PreprocessorMonad Lifetime
 castLifetime (A.ExplicitLifetime p ident) = do
-    throwError $ Other "Not yet implemented" p
+    throw $ Other "Not yet implemented" p
 castLifetime (A.ImplicitLifetime _) = do
     LifetimeState lifetime _ <- gets lifetimeState
     return lifetime
 
--- getItemIdent :: A.Item' a -> A.Ident
--- getItemIdent (A.ItemFunction _ ident _ _ _) = ident
--- getItemIdent (A.ItemStruct _ ident _) = ident
--- getItemIdent (A.ItemVariant _ ident _) = ident
--- getItemIdent (A.ItemVariable _ _ ident _ _) = ident
-
 getShortestLifetimeOfUsedVariables :: A.BNFC'Position -> PreprocessorMonad Lifetime
 getShortestLifetimeOfUsedVariables p = do
     usedVariables <- gets usedVariables
-    when (null usedVariables) $ throwError (CannotMakeEmptyReference p)
-    lifetimes <- traverse (\id -> do
+    when (null usedVariables) $ throw (CannotMakeEmptyReference p)
+    zipped <- traverse (\id -> do
         variable <- getVariableById id
-        return $ lifetime variable) usedVariables
-    let head:tail = lifetimes
-    foldM (\first second -> do
-        if isSubLifetime first second then
-            return second
-        else if isSubLifetime second first then
-            return first
-        else
-            throwError $ LifetimesMismatch first second
-        ) head tail
+        let Identifier position _ = variableIdentifier variable
+        return (lifetime variable, position)) usedVariables
+    let head:tail = zipped
+    (l, p) <- foldM helper head tail
+    return l
+  where
+    helper (l1, p1) (l2, p2) = do
+        l <- getShorterOfLifetimesOrThrow p1 p2 l1 l2
+        return $ if l == l1 then
+                (l1, p1)
+            else
+                (l2, p2)
+
+
+getShorterOfLifetimesOrThrow :: A.BNFC'Position -> A.BNFC'Position -> Lifetime -> Lifetime -> PreprocessorMonad Lifetime
+getShorterOfLifetimesOrThrow p1 p2 first second = do
+    if isSubLifetime first second then
+        return second
+    else if isSubLifetime second first then
+        return first
+    else
+        throw $ LifetimesMismatch p1 p2 first second
+
+-- assumes f1 and f2 are function types
+mergeFunctionTypesOrThrow :: A.BNFC'Position -> Type -> Type -> PreprocessorMonad Type
+mergeFunctionTypesOrThrow p f1 f2 = do
+    let TFunction name1 kind1 params1 returnType1 = f1
+    let TFunction _ kind2 params2 returnType2 = f2
+    when (params1 /= params2 || returnType1 /= returnType2) $ throw (TypeMismatch p f1 f2)
+    return $ TFunction name1 (getStricterOfFunctionKinds kind1 kind2) params1 returnType1
+
+nameOfItem :: A.Item -> String
+nameOfItem (A.ItemFunction _ (A.Ident ident) _ _ _ _) = ident
+nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
+nameOfItem (A.ItemVariant _ (A.Ident ident) _ _) = ident
+nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident

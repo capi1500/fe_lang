@@ -15,19 +15,23 @@ data PreprocessorError =
     TypeAlreadyInScope Identifier Type Type | -- ident, new definition, old definition
     TypeNotDefined Identifier |
     TypeMismatch BNFC'Position Type Type | -- ident, ident actual type, ident expected type
+    ExpressionNotCallable BNFC'Position Type |
     VariableNotDefined Identifier |
     ConstantNotInitialized Identifier |
     VariableAtGlobalScope Identifier |
     UninitializedVariableUsed BNFC'Position Identifier | -- where, defined
     CannotBorrow VariableId Identifier |
-    LifetimesMismatch Lifetime Lifetime |
+    CannotMoveOut Variable |
+    LifetimesMismatch BNFC'Position BNFC'Position  Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |
     InitializeConstantAsMutable Identifier Type |
+    WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position
   deriving (Eq, Ord, Show, Read)
 
 data PreprocessorWarning =
     Shadow Identifier Identifier |
+    VariableNotInitializedNotUsed Identifier |
     Debug String
   deriving (Eq, Ord, Show, Read)
 

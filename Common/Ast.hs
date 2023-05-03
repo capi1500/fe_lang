@@ -58,6 +58,7 @@ data Expression =
     -- IndexExpression Expression Expression |
     -- UnaryExpression UnaryOperator Expression |
     UnaryMinusExpression Expression |
+    UnaryNegationExpression Expression |
     -- TypeCastExpression Expression (Type) |
     I32DoubleOperatorExpression NumericDoubleOperator Expression Expression |
     BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression
@@ -87,7 +88,6 @@ data NumericDoubleOperator =
 
 data BooleanDoubleOperator =
     Equals |
-    NotEquals |
     Greater |
     Smaller |
     GreaterEquals |
@@ -109,10 +109,17 @@ data Value =
     VReference Pointer
   deriving (Eq, Ord, Show, Read)
 
-isPrimitiveValue :: Value -> Bool
-isPrimitiveValue (VI32 _) = True
-isPrimitiveValue (VChar _) = True
-isPrimitiveValue (VBool _) = True
-isPrimitiveValue VUnit = True
-isPrimitiveValue (VArray _ _) = True
-isPrimitiveValue _ = False
+isString :: [Value] -> Bool
+isString = all isChar
+
+isChar :: Value -> Bool
+isChar (VChar _) = True
+isChar _ = False
+
+-- isPrimitiveValue :: Value -> Bool
+-- isPrimitiveValue (VI32 _) = True
+-- isPrimitiveValue (VChar _) = True
+-- isPrimitiveValue (VBool _) = True
+-- isPrimitiveValue VUnit = True
+-- isPrimitiveValue (VArray _ _) = True
+-- isPrimitiveValue _ = False

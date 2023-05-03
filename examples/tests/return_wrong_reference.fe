@@ -1,0 +1,8 @@
+fn foo() -> &i32 {
+	var y = 5;
+	&y
+}
+
+fn main() {
+	const x = foo();
+}

@@ -9,7 +9,7 @@ class CodePrint a where
     codePrint :: Int -> a -> String
 
 instance CodePrint Ident where
-    codePrint _ (Ident value) = show value
+    codePrint _ (Ident value) = value
 
 instance CodePrint a => CodePrint [a] where
     codePrint tabs lst = intercalate "," (fmap (codePrint tabs) lst)

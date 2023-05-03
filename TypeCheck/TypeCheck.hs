@@ -1,6 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module TypeCheck.TypeCheck where
 
 import Data.Bits (xor)
@@ -16,7 +17,6 @@ import Fe.Abs (HasPosition(hasPosition))
 import Common.Ast
 import Common.Utils
 import Common.Types
-import Common.Annotation
 import Common.Scope
 
 import TypeCheck.Utils
@@ -24,6 +24,8 @@ import TypeCheck.State
 import TypeCheck.StateFunctions
 import TypeCheck.Error
 import TypeCheck.Variable
+import Data.List (intercalate)
+import Common.Printer
 
 class TypeCheck a b where
     typeCheck :: a -> PreprocessorMonad b
@@ -37,7 +39,7 @@ instance TypeCheck A.Type Type where
         t' <- typeCheck t
         return $ arrayType t'
     typeCheck (A.TypeFunction p functionKind lifetime params returnType) = do
-    throwError $ Other "Not yet implemented" p
+    throw $ Other "Not yet implemented" p
 
 
 instance TypeCheck A.Code Code where
@@ -60,7 +62,7 @@ addToScope (A.ItemFunction p ident lifetimes params returnType _) = do
     declaredReturnType <- typeCheck returnType
     -- lifetimes' <- typeCheck lifetimes
     let identifier = Identifier p ident
-    let t = TFunction $ Function
+    let t = TFunction
             (NamedFunction identifier)
             Fn
             params'
@@ -68,12 +70,12 @@ addToScope (A.ItemFunction p ident lifetimes params returnType _) = do
     addVariable identifier t Uninitialized
     return ()
 addToScope (A.ItemStruct p ident lifetimes fields) = do
-    throwError $ Other "Not yet implemented" p
+    throw $ Other "Not yet implemented" p
 addToScope (A.ItemVariant p ident lifetimes types) = do
-    throwError $ Other "Not yet implemented" p
+    throw $ Other "Not yet implemented" p
 addToScope (A.ItemVariable p cv ident typeDeclaration initialization) = do
     scope <- gets typeDefinitions
-    when (isGlobal scope && isVariable cv) (do throwError $ VariableAtGlobalScope (Identifier p ident))
+    when (isGlobal scope && isVariable cv) (do throw $ VariableAtGlobalScope (Identifier p ident))
 
 instance TypeCheck A.Statement Statement where
     typeCheck :: A.Statement -> PreprocessorMonad Statement
@@ -81,6 +83,8 @@ instance TypeCheck A.Statement Statement where
         return EmptyStatement
     typeCheck (A.ItemStatement p item) = do
         addToScope item
+        Variables _ variables <- gets variables
+        addWarning $ Debug ("Added item " ++ nameOfItem item ++ ": [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]")
         typeCheck item
     typeCheck (A.ExpressionStatement p expression) = do
         expression' <- typeCheck expression
@@ -95,7 +99,7 @@ instance TypeCheck A.Item Statement where
         let identifier = Identifier p ident
         (id, Variable originalIdentifier functionType _ _ _ lifetime) <- getVariable identifier
 
-        let (TFunction (Function _ _ params declaredType)) = functionType
+        let TFunction _ _ params declaredType = functionType
 
         let addFunctionParam = \(FunctionParam i t) -> do
                 addVariable i t Free
@@ -105,8 +109,9 @@ instance TypeCheck A.Item Statement where
         (expression', actualType, paramIds) <- inNewFrame p $ do
                 paramIds <- traverse addFunctionParam params
                 TypedExpression expression' actualType actualLifetime <- typeCheck expression
-                -- For now only static lifetime stuff can be returned
-                unless (isSubLifetime staticLifetime actualLifetime) $ do throwError (LifetimesMismatch staticLifetime actualLifetime)
+                -- TODO: for now, only static expressions (temporary and moved values) are returned
+                addWarning $ Debug ("Returning value with lifetime: " ++ show actualLifetime)
+                unless (isSubLifetime actualLifetime staticLifetime) $ do throw (LifetimesMismatch Nothing (hasPosition expression) staticLifetime actualLifetime)
                 return (expression', actualType, paramIds)
 
         assertType declaredType actualType p
@@ -114,12 +119,12 @@ instance TypeCheck A.Item Statement where
         return $ NewFunctionStatement identifier ident expression' paramIds
 
     typeCheck (A.ItemStruct p ident lifetimes fields) = do
-        throwError $ Other "Not yet implemented" p
+        throw $ Other "Not yet implemented" p
     typeCheck (A.ItemVariant p ident lifetimes subtypes) = do
-        throwError $ Other "Not yet implemented" p
+        throw $ Other "Not yet implemented" p
     typeCheck (A.ItemVariable p cv ident typeDeclaration initialization) = do
         let identifier = Identifier p ident
-        when (isConst cv && isUnInitialized initialization) $ throwError $ ConstantNotInitialized identifier
+        when (isConst cv && isUnInitialized initialization) $ throw $ ConstantNotInitialized identifier
 
         declaredType <- typeCheck typeDeclaration
         (initialization', t) <- if isInitialized initialization then do
@@ -127,18 +132,18 @@ instance TypeCheck A.Item Statement where
             TypedExpression expression' initializedType initializationLifetime <- typeCheck expression
             when (declaredType /= TUntyped) $ assertType declaredType initializedType p
             lifetime <- getLifetime
-            unless (isSubLifetime initializationLifetime lifetime) $ throwError (LifetimesMismatch lifetime initializationLifetime)
-            when (isVariable cv && isConstReference initializedType) $ throwError (InitializeConstantAsMutable identifier initializedType)
+            unless (isSubLifetime initializationLifetime lifetime) $ throw (LifetimesMismatch p (hasPosition expression) lifetime initializationLifetime)
             return (VarInitialized expression', initializedType)
         else do
             return (VarUninitialized, declaredType)
 
+        when (isVariable cv && isConstReference t) $ throw (InitializeConstantAsMutable identifier t)
         let variableState =
                 if isUnInitialized initialization then Uninitialized
                 else Free
 
         id <- addVariable identifier t variableState
-        handleUsedVariables (borrowMutVariable id)
+        handleUsedVariables (transferOwnership id)
         return $ NewVariableStatement identifier ident initialization'
 
 instance TypeCheck A.FunctionParam FunctionParam where
@@ -161,39 +166,55 @@ instance TypeCheck A.TypeDeclaration Type where
     typeCheck (A.Typed _ t) = do
         typeCheck t
 
+-- each expression should handle its used variables
 instance TypeCheck A.Expression TypedExpression where
     typeCheck :: A.Expression -> PreprocessorMonad TypedExpression
     typeCheck (A.BlockExpression p statements) = do
         statements' <- inNewScope p $ traverse typeCheck statements
-        let (t, actualLifetime) = if null statements' then
-                (unitType, staticLifetime)
+        let (t, actualLifetime, lastPosition) = if null statements' then
+                (unitType, staticLifetime, Nothing)
             else
                 case last statements' of
-                ExpressionStatement (TypedExpression _ t l) -> (t, l)
-                _ -> (unitType, staticLifetime)
-        unless (isSubLifetime staticLifetime actualLifetime) $ do throwError (LifetimesMismatch staticLifetime actualLifetime)
-        handleUsedVariables moveOutVariable
+                ExpressionStatement (TypedExpression _ t l) -> (t, l, hasPosition (last statements))
+                _ -> (unitType, staticLifetime, Nothing)
+        -- TODO: this should not restrict to the static lifetime, see multiple_variables_on_write as a counterexample
+        unless (isSubLifetime actualLifetime staticLifetime) $ do throw (LifetimesMismatch Nothing lastPosition staticLifetime actualLifetime)
         return $ TypedExpression (BlockExpression statements') t actualLifetime
---     typeCheck (A.GroupedExpression _ expression) = do
---         typeCheck expression
+    typeCheck (A.GroupedExpression _ expression) = do
+        typeCheck expression
     typeCheck (A.VariableExpression p ident) = do
         (id, variable) <- getVariable (Identifier p ident)
-        unless (isMoveableOnVariableExpression (variableType variable)) $ markVariableUsed id
+        markVariableUsed id
         return $ TypedExpression (VariableExpression ident) (variableType variable) staticLifetime
-    -- typeCheck (A.IfExpression p ifExpression) = do
-    --     typeCheck ifExpression
-    -- typeCheck (A.CallExpression p function params) = do
-    --     throwError $ Other "Not yet implemented" (hasPosition x)
-    -- typeCheck (A.UnaryExpression _ (A.UnaryMinus p) e) = do
-    --     TypedExpression e' t moves <- typeCheck e
-    --     assertType t i32Type (hasPosition e)
-    --     return $ TypedExpression (UnaryMinusExpression e') i32Type moves
-    -- typeCheck (A.UnaryExpression _ (A.UnaryNegation p) e) = do
-    --     TypedExpression e' t moves <- typeCheck e
-    --     assertType t boolType (hasPosition e)
-    --     return $ TypedExpression (UnaryMinusExpression e') boolType moves
+    typeCheck (A.IfExpression p ifExpression) = do
+        typeCheck ifExpression
+    typeCheck (A.CallExpression p function params) = do
+        TypedExpression function' t _ <- typeCheck function
+        unless (isFunction t) $ do throw (ExpressionNotCallable p t)
+        handleUsedVariables moveOutVariable
+
+        let TFunction _ kind declaredParams returnType = t
+        when (length params /= length declaredParams) $ throw (WrongNumberOfParams p t)
+        let paramCheck = \(FunctionParam paramIdent paramDeclaredType, param) -> do
+            TypedExpression paramExpression paramType _ <- typeCheck param
+            assertType paramType paramDeclaredType (hasPosition param)
+            handleUsedVariables moveOutVariable
+            return paramExpression
+        params' <- traverse paramCheck (zip declaredParams params)
+        -- TODO: for now, only static expressions (temporary and moved values) are returned
+        return $ TypedExpression (CallExpression function' params') returnType staticLifetime
+    typeCheck (A.UnaryExpression _ (A.UnaryMinus p) e) = do
+        TypedExpression e' t l <- typeCheck e
+        assertType t i32Type (hasPosition e)
+        handleUsedVariables moveOutVariable
+        return $ TypedExpression (UnaryMinusExpression e') i32Type staticLifetime
+    typeCheck (A.UnaryExpression _ (A.UnaryNegation p) e) = do
+        TypedExpression e' t l <- typeCheck e
+        assertType t boolType (hasPosition e)
+        handleUsedVariables moveOutVariable
+        return $ TypedExpression (UnaryNegationExpression e') boolType staticLifetime
     -- typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
-    --     throwError $ Other "Not yet implemented" (hasPosition x)
+    --     throw $ Other "Not yet implemented" (hasPosition x)
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         TypedExpression e' t _ <- typeCheck e
         let t' = TReference Const t
@@ -232,98 +253,98 @@ instance TypeCheck A.Expression TypedExpression where
         makeI32DoubleOperatorExpression e1 e2 BitXor p
     typeCheck (A.BitAndExpression p e1 e2) = do
         makeI32DoubleOperatorExpression e1 e2 BitAnd p
-    -- typeCheck (A.ComparisonExpression _ e1 operator e2) = do
-    --     makeComparisonOperatorExpression operator e1 e2
+    typeCheck (A.ComparisonExpression _ e1 operator e2) = do
+        e <- makeComparisonOperatorExpression operator e1 e2
+        handleUsedVariables moveOutVariable
+        return e
     typeCheck x = do
-        throwError $ Other "Not yet implemented" (hasPosition x)
+        throw $ Other "Not yet implemented" (hasPosition x)
 
 makeI32DoubleOperatorExpression :: A.Expression -> A.Expression -> NumericDoubleOperator -> A.BNFC'Position -> PreprocessorMonad TypedExpression
 makeI32DoubleOperatorExpression e1 e2 operator p = do
-    TypedExpression e1' t1 lifetime1 <- typeCheck e1
-    TypedExpression e2' t2 lifetime2 <- typeCheck e2
+    TypedExpression e1' t1 _ <- typeCheck e1
+    TypedExpression e2' t2 _ <- typeCheck e2
     assertType t1 i32Type (hasPosition e1)
     assertType t2 i32Type (hasPosition e2)
-    lifetime <- getShortestLifetimeOfUsedVariables p
     handleUsedVariables moveOutVariable
-    tempVariableId <- addTemporaryVariable p i32Type
-    markVariableUsed tempVariableId
-    return $ TypedExpression (I32DoubleOperatorExpression operator e1' e2') i32Type lifetime
+    return $ TypedExpression (I32DoubleOperatorExpression operator e1' e2') i32Type staticLifetime
 
--- makeComparisonOperatorExpression :: A.ComparisonOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
--- makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
---     TypedExpression e1' t1 <- typeCheck e1
---     TypedExpression e2' t2 <- typeCheck e2
---     assertType t1 t2 p
---     return $ TypedExpression (BoolDoubleOperatorExpression Equals e1' e2') boolType
--- makeComparisonOperatorExpression (A.NotEquals p) e1 e2 = do
---     TypedExpression e1' t1 <- typeCheck e1
---     TypedExpression e2' t2 <- typeCheck e2
---     assertType t1 t2 p
---     return $ TypedExpression (BoolDoubleOperatorExpression NotEquals e1' e2') boolType
--- makeComparisonOperatorExpression (A.Greater p) e1 e2 = do
---     makeI32ComparisonExpression e1 e2 Greater
--- makeComparisonOperatorExpression (A.Smaller p) e1 e2 = do
---     makeI32ComparisonExpression e1 e2 Smaller
--- makeComparisonOperatorExpression (A.GreaterEquals p) e1 e2 = do
---     makeI32ComparisonExpression e1 e2 GreaterEquals
--- makeComparisonOperatorExpression (A.SmallerEquals p) e1 e2 = do
---     makeI32ComparisonExpression e1 e2 SmallerEquals
+makeComparisonOperatorExpression :: A.ComparisonOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
+makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
+    TypedExpression e1' t1 _ <- typeCheck e1
+    TypedExpression e2' t2 _ <- typeCheck e2
+    assertType t1 t2 p
+    return $ TypedExpression (BoolDoubleOperatorExpression Equals e1' e2') boolType staticLifetime
+makeComparisonOperatorExpression (A.NotEquals p) e1 e2 = do
+    TypedExpression e1' t1 _ <- typeCheck e1
+    TypedExpression e2' t2 _ <- typeCheck e2
+    assertType t1 t2 p
+    return $ TypedExpression (UnaryNegationExpression (BoolDoubleOperatorExpression Equals e1' e2')) boolType staticLifetime
+makeComparisonOperatorExpression (A.Greater p) e1 e2 = do
+    makeI32ComparisonExpression e1 e2 Greater
+makeComparisonOperatorExpression (A.Smaller p) e1 e2 = do
+    makeI32ComparisonExpression e1 e2 Smaller
+makeComparisonOperatorExpression (A.GreaterEquals p) e1 e2 = do
+    makeI32ComparisonExpression e1 e2 GreaterEquals
+makeComparisonOperatorExpression (A.SmallerEquals p) e1 e2 = do
+    makeI32ComparisonExpression e1 e2 SmallerEquals
 
--- makeI32ComparisonExpression :: A.Expression -> A.Expression -> BooleanDoubleOperator -> PreprocessorMonad TypedExpression
--- makeI32ComparisonExpression e1 e2 operator = do
---     TypedExpression e1' t1 <- typeCheck e1
---     TypedExpression e2' t2 <- typeCheck e2
---     assertType t1 i32Type (hasPosition e1)
---     assertType t2 i32Type (hasPosition e2)
---     return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') boolType
+makeI32ComparisonExpression :: A.Expression -> A.Expression -> BooleanDoubleOperator -> PreprocessorMonad TypedExpression
+makeI32ComparisonExpression e1 e2 operator = do
+    TypedExpression e1' t1 _ <- typeCheck e1
+    TypedExpression e2' t2 _ <- typeCheck e2
+    assertType t1 i32Type (hasPosition e1)
+    assertType t2 i32Type (hasPosition e2)
+    return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') boolType staticLifetime
 
--- instance TypeCheck A.IfExpression TypedExpression where
---     typeCheck :: A.IfExpression -> PreprocessorMonad TypedExpression
---     typeCheck (A.If p condition onTrue) = do
---         TypedExpression condition' conditionType <- typeCheck condition
---         assertType conditionType boolType (hasPosition condition)
---         TypedExpression onTrue' onTrueType <- typeCheck onTrue
---         assertType onTrueType unitType (hasPosition onTrue)
---         return $ TypedExpression (IfExpression condition' onTrue' Nothing) boolType
---     typeCheck (A.IfElse p condition onTrue onFalse) = do
---         TypedExpression condition' conditionType <- typeCheck condition
---         assertType conditionType boolType (hasPosition condition)
---         TypedExpression onTrue' onTrueType <- typeCheck onTrue
---         TypedExpression onFalse' onFalseType <- typeCheck onFalse
---         assertType onFalseType onTrueType (hasPosition onFalse)
---         return $ TypedExpression (IfExpression condition' onTrue' (Just onFalse')) onTrueType
---     typeCheck (A.IfElseIf p condition onTrue onFalse) = do
---         TypedExpression condition' conditionType <- typeCheck condition
---         assertType conditionType boolType (hasPosition condition)
---         TypedExpression onTrue' onTrueType <- typeCheck onTrue
---         TypedExpression onFalse' onFalseType <- typeCheck onFalse
---         assertType onFalseType onTrueType (hasPosition onFalse)
---         return $ TypedExpression (IfExpression condition' onTrue' (Just onFalse')) onTrueType
+instance TypeCheck A.IfExpression TypedExpression where
+    typeCheck :: A.IfExpression -> PreprocessorMonad TypedExpression
+    typeCheck (A.If p condition onTrue) =
+        helper condition onTrue (A.BlockExpression p [])
+    typeCheck (A.IfElse p condition onTrue onFalse) =
+        helper condition onTrue onFalse
+    typeCheck (A.IfElseIf p condition onTrue onFalse) =
+        helper condition onTrue onFalse
+
+helper :: (TypeCheck a TypedExpression, HasPosition a) => A.Expression -> A.Expression -> a -> PreprocessorMonad TypedExpression
+helper condition onTrue onFalse = do
+    TypedExpression condition' conditionType _ <- typeCheck condition
+    assertType conditionType boolType (hasPosition condition)
+    handleUsedVariables moveOutVariable
+    TypedExpression onTrue' onTrueType onTrueLifetime <- typeCheck onTrue -- Block expression, it handles borrow checker automatically
+    TypedExpression onFalse' onFalseType onFalseLifetime <- typeCheck onFalse -- Block expression, it handles borrow checker automatically
+    t <- if isFunction onTrueType && isFunction onFalseType then do
+        mergeFunctionTypesOrThrow (hasPosition onTrue) onTrueType onFalseType
+    else do
+        assertType onFalseType onTrueType (hasPosition onTrue)
+        return onTrueType
+    lifetime <- getShorterOfLifetimesOrThrow (hasPosition onTrue) (hasPosition onFalse) onTrueLifetime onFalseLifetime
+    return $ TypedExpression (IfExpression condition' onTrue' (Just onFalse')) t lifetime
 
 instance TypeCheck A.Literal TypedExpression where
     typeCheck :: A.Literal -> PreprocessorMonad TypedExpression
     typeCheck (A.LiteralChar p char) = do
-        id <- addTemporaryVariable p charType
-        markVariableUsed id
+        -- id <- addTemporaryVariable p charType
+        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VChar char) charType staticLifetime
     typeCheck (A.LiteralString p string) = do
-        id <- addTemporaryVariable p stringType
-        markVariableUsed id
+        -- id <- addTemporaryVariable p stringType
+        -- markVariableUsed id
         return $ TypedExpression (MakeArrayExpression (fmap VChar string)) stringType staticLifetime
     typeCheck (A.LiteralInteger p integer) = do
-        id <- addTemporaryVariable p i32Type
-        markVariableUsed id
+        -- id <- addTemporaryVariable p i32Type
+        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VI32 (fromIntegral integer)) i32Type staticLifetime
     typeCheck (A.LiteralBoolean p (A.BoolTrue _)) = do
-        id <- addTemporaryVariable p boolType
-        markVariableUsed id
+        -- id <- addTemporaryVariable p boolType
+        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VBool True) boolType staticLifetime
     typeCheck (A.LiteralBoolean p (A.BoolFalse _)) = do
-        id <- addTemporaryVariable p boolType
-        markVariableUsed id
+        -- id <- addTemporaryVariable p boolType
+        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VBool False) boolType staticLifetime
 
--- instance TypeCheck A.CallParam TypedExpression where
---     typeCheck :: A.CallParam -> PreprocessorMonad TypedExpression
---     typeCheck (A.CallParam p expression) = do
---         typeCheck expression
+instance TypeCheck A.CallParam TypedExpression where
+    typeCheck :: A.CallParam -> PreprocessorMonad TypedExpression
+    typeCheck (A.CallParam _ expression) = do
+        typeCheck expression

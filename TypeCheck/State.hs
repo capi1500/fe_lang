@@ -30,7 +30,7 @@ data PreprocessorState = PreprocessorState {
     usedVariables :: [VariableId]
 } deriving (Eq, Ord, Show, Read)
 
-type PreprocessorMonad a = StateT PreprocessorState (Except PreprocessorError) a
+type PreprocessorMonad a = StateT PreprocessorState (Except (PreprocessorError, PreprocessorState)) a
 
 makePreprocessorState :: PreprocessorState
 makePreprocessorState = PreprocessorState {
@@ -82,3 +82,8 @@ addWarning warning = do
 
 instance CodePrint Variables where
   codePrint tabs (Variables _ list) = "[" ++ intercalate ("\n" ++ printTabs tabs) (fmap show list) ++ "]"
+
+throw :: PreprocessorError -> PreprocessorMonad a
+throw err = do
+    state <- get
+    throwError (err, state)

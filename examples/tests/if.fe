@@ -1,0 +1,9 @@
+fn main() -> i32 {
+	if (5 == 1) {
+		3
+	} else if ("hello" == "there") {
+		6
+	} else {
+		-1
+	}
+}

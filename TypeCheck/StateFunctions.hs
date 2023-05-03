@@ -2,7 +2,10 @@ module TypeCheck.StateFunctions where
 
 import Prelude hiding (lookup)
 import Data.Maybe
-import Data.Map (empty, lookup, insert, member)
+import Data.Map (empty, lookup, insert, member, elems)
+import Data.Set (delete, singleton, insert)
+import Data.List (isPrefixOf, intercalate, nub)
+import Data.Foldable (traverse_)
 import Control.Monad.State
 import Control.Monad.Except
 
@@ -11,14 +14,11 @@ import Fe.Abs (Ident (Ident), BNFC'Position)
 import Common.Scope
 import Common.Utils
 import Common.Types
+import Common.Printer
 
 import TypeCheck.State
 import TypeCheck.Error
-import Data.Foldable (traverse_)
-import Data.Set (delete, singleton, insert)
 import TypeCheck.Variable
-import Data.List (isPrefixOf, intercalate)
-import Common.Printer (CodePrint(codePrint))
 
 makeNewFrame :: Variables -> Variables
 makeNewFrame (Variables (Global global) variables) = Variables (Local (Global global) empty) variables
@@ -29,7 +29,7 @@ getType identifier = do
     let (Identifier p ident) = identifier
     state <- get
     let maybeType = helper ident (typeDefinitions state)
-    when (isNothing maybeType) $ do throwError $ TypeNotDefined identifier
+    when (isNothing maybeType) $ do throw $ TypeNotDefined identifier
     return $ fromJust maybeType
   where
     helper :: Ident -> TypeDefinitions -> Maybe Type
@@ -48,7 +48,7 @@ addType identifier t = do
     let (Identifier _ ident) = identifier
     state <- get
     let maybeDefinition = getTypeLocal identifier (typeDefinitions state)
-    when (isJust maybeDefinition) $ do throwError $ TypeAlreadyInScope identifier t (fromJust maybeDefinition)
+    when (isJust maybeDefinition) $ do throw $ TypeAlreadyInScope identifier t (fromJust maybeDefinition)
     putTypeDefinitions (helper ident t (typeDefinitions state))
   where
     helper ident t (Global types) = Global (Data.Map.insert ident t types)
@@ -59,7 +59,7 @@ getVariable identifier = do
     let Identifier _ ident = identifier
     Variables scope variables <- gets variables
     let maybeOut = helper ident scope variables
-    when (isNothing maybeOut) $ throwError (VariableNotDefined identifier)
+    when (isNothing maybeOut) $ throw (VariableNotDefined identifier)
     return $ fromJust maybeOut
   where
     helper :: Ident -> VariableMappings -> [Variable] -> Maybe (VariableId, Variable)
@@ -132,6 +132,17 @@ internalAddVariable identifier t variableState id = do
         putVariables $ Variables (Local parent (Data.Map.insert ident id mappings)) (listPushBack variable variables)
         return id
 
+setVariableById :: VariableId -> Variable -> PreprocessorMonad ()
+setVariableById id variable = do
+    Variables mappings variables <- gets variables
+    let variables' = listSet id variable variables
+    putVariables $ Variables mappings variables'
+
+mutateVariableById :: VariableId -> (Variable -> Variable) -> PreprocessorMonad ()
+mutateVariableById id mutate = do
+    variable <- getVariableById id
+    setVariableById id (mutate variable)
+
 inNewFrame :: BNFC'Position -> PreprocessorMonad a -> PreprocessorMonad a
 inNewFrame p f = do
     state <- get
@@ -156,6 +167,10 @@ inNewScope p f = do
 
 reproduceWithPersistent :: PreprocessorState -> PreprocessorMonad ()
 reproduceWithPersistent state = do
+    variables <- gets variables
+    let Variables (Local _ map) _ = variables
+    traverse_ moveOutVariable (reverse (elems map))
+
     warnings <- gets warnings
     LifetimeState _ id <- gets lifetimeState
     put state
@@ -185,37 +200,80 @@ markVariableUsed id = do
 handleUsedVariables :: (VariableId -> PreprocessorMonad ()) -> PreprocessorMonad ()
 handleUsedVariables handler = do
     usedVariables <- gets usedVariables
-    traverse_ handler usedVariables
+    traverse_ handler (reverse usedVariables)
     clearUsedVariables
 
 moveOutVariable :: VariableId -> PreprocessorMonad ()
 moveOutVariable id = do
-    Variables _ variables <- gets variables
-    let Variable _ _ _ borrows borrowsMut _ = listGet id variables
-    addWarning $ Debug ("Moving out " ++ show id)
-    traverse_ (removeBorrow id) borrows
-    traverse_ removeMutBorrow borrowsMut
+    variable <- getVariableById id
+
+    shouldMove <- internalShouldMove variable
+    if not shouldMove then do return ()
+    else do
+
+    addWarning $ Debug ("Moving out " ++ show id ++ " " ++ show (variableIdentifier variable))
+    traverse_ (removeBorrow id) (borrows variable)
+    traverse_ removeMutBorrow (borrowsMut variable)
+    setVariableById id (setVariableState Moved variable)
   where
     removeBorrow :: VariableId -> VariableId -> PreprocessorMonad ()
     removeBorrow borrowerId borrowedId = do
         addWarning $ Debug ("    Removing borrow of " ++ show borrowedId)
-        Variables mappings variables <- gets variables
-        let Variable ident t (Borrowed whatBorrowed) borrows borrowsMut lifetime = listGet borrowedId variables
-        let state' = if null whatBorrowed then Free
-                else Borrowed (delete borrowerId whatBorrowed)
-        let variable' = Variable ident t state' borrows borrowsMut lifetime
-        let variables' = listSet borrowedId variable' variables
-        putVariables $ Variables mappings variables'
+        variable <- getVariableById borrowedId
+        let Borrowed whatBorrowed = variableState variable
+        let whatBorrowed' = delete borrowerId whatBorrowed
+        let state' = if null whatBorrowed' then Free
+                else Borrowed whatBorrowed'
+        setVariableById borrowedId (setVariableState state' variable)
         return ()
     removeMutBorrow :: VariableId -> PreprocessorMonad ()
     removeMutBorrow borrowedId = do
         addWarning $ Debug ("    Removing mutable borrow of " ++ show borrowedId)
-        Variables mappings variables <- gets variables
-        let Variable ident t (BorrowedMut _) borrows borrowsMut lifetime = listGet borrowedId variables
-        let variable' = Variable ident t Free borrows borrowsMut lifetime
-        let variables' = listSet borrowedId variable' variables
-        putVariables $ Variables mappings variables'
+        mutateVariableById borrowedId (setVariableState Free)
         return ()
+
+transferOwnership  :: VariableId -> VariableId -> PreprocessorMonad ()
+transferOwnership newOwnerId movedOutId = do
+    newOwner <- getVariableById newOwnerId
+    movedOut <- getVariableById movedOutId
+
+    shouldMove <- internalShouldMove movedOut
+    if not shouldMove then do return ()
+    else do
+
+    newOwnerBorrows <- foldM (transferBorrow newOwnerId movedOutId) (borrows newOwner) (borrows movedOut)
+    newOwnerBorrowsMut <- foldM (transferMutBorrow newOwnerId) (borrowsMut newOwner) (borrowsMut movedOut)
+
+    setVariableById newOwnerId (changeVariable (variableState newOwner) (nub newOwnerBorrows) (nub newOwnerBorrowsMut) newOwner)
+    setVariableById movedOutId (changeVariable Moved [] [] movedOut)
+  where
+    transferBorrow :: VariableId -> VariableId -> [VariableId] -> VariableId -> PreprocessorMonad [VariableId]
+    transferBorrow newOwnerId movedOutId combinedBorrowsList borrowedId = do
+        variable <- getVariableById borrowedId
+        let Borrowed whatBorrowed = variableState variable
+        let whatBorrowed' = delete movedOutId whatBorrowed
+        let whatBorrowed'' = Data.Set.insert newOwnerId whatBorrowed'
+        setVariableById borrowedId (setVariableState (Borrowed whatBorrowed'') variable)
+        return $ borrowedId:combinedBorrowsList
+    transferMutBorrow :: VariableId -> [VariableId] -> VariableId -> PreprocessorMonad [VariableId]
+    transferMutBorrow newOwnerId combinedBorrowsList borrowedId = do
+        mutateVariableById borrowedId (setVariableState (BorrowedMut newOwnerId))
+        return $ borrowedId:combinedBorrowsList
+
+internalShouldMove :: Variable -> PreprocessorMonad Bool
+internalShouldMove variable = do
+    let state = variableState variable
+    if state == Moved then do
+        return False
+    else if state == Uninitialized then do
+        addWarning $ VariableNotInitializedNotUsed (variableIdentifier variable)
+        return False
+    else do
+        unless (state == Free) $ throw (CannotMoveOut variable)
+        if not (isOnceFunction (variableType variable)) then do
+            return False
+        else do
+            return True
 
 borrowVariable :: VariableId -> VariableId -> PreprocessorMonad ()
 borrowVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
@@ -228,7 +286,7 @@ borrowVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId mark
                 let Borrowed whatBorrows = state
                 return $ Borrowed (Data.Set.insert borrowerId whatBorrows)
         else do
-            throwError (CannotBorrow borrowerId ident)
+            throw (CannotBorrow borrowerId ident)
         return $ Variable ident t state' borrows borrowsMut lifetime
     addBorrowed :: Variable -> PreprocessorMonad Variable
     addBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
@@ -239,7 +297,7 @@ borrowMutVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId m
   where
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
     markAsBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
-        unless (state == Free) $ throwError (CannotBorrow borrowerId ident)
+        unless (state == Free) $ throw (CannotBorrow borrowerId ident)
         return $ Variable ident t (BorrowedMut borrowerId) borrows borrowsMut lifetime
     addBorrowed :: Variable -> PreprocessorMonad Variable
     addBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
@@ -247,16 +305,12 @@ borrowMutVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId m
 
 borrowInternal :: VariableId -> VariableId -> (Variable -> PreprocessorMonad Variable) -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
 borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed = do
-    let warning1 = show borrowerId ++ " borrows " ++ show borrowedId
-    Variables mappings variables <- gets variables
-    let warning2 = "\n    state before: [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]"
-    borrowerVariable' <- addBorrowed (listGet borrowerId variables)
-    borrowedVariable' <- markAsBorrowed (listGet borrowedId variables)
-    let variables' = listSet borrowerId borrowerVariable' variables
-    let variables'' = listSet borrowedId borrowedVariable' variables'
-    let warning3 = "\n    state after: [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables'') ++ "]"
-    addWarning $ Debug (warning1 ++ warning2 ++ warning3)
-    putVariables $ Variables mappings variables''
+    borrowerVariable <- getVariableById borrowerId
+    borrowedVariable <- getVariableById borrowedId
+    borrowerVariable' <- addBorrowed borrowerVariable
+    borrowedVariable' <- markAsBorrowed borrowedVariable
+    setVariableById borrowerId borrowerVariable'
+    setVariableById borrowedId borrowedVariable'
 
 -- TODO: Dobrze by to było przetestować
 -- Teoretycznie jeśli zrobi się

@@ -11,13 +11,12 @@ import Fe.Par   ( pCode, myLexer )
 import Fe.Print ( Print, printTree )
 import Fe.Skel  ()
 
-import Common.Annotation
 import Common.Ast
 import Common.Utils
 
 import TypeCheck.TypeCheck (typeCheck)
 import TypeCheck.Error (PreprocessorError)
-import TypeCheck.State (PreprocessorState (PreprocessorState), makePreprocessorState)
+import TypeCheck.State (PreprocessorState (PreprocessorState, warnings), makePreprocessorState)
 
 import Exec.Exec
 import Exec.State
@@ -70,16 +69,20 @@ typeCheckStage code =
     let err = runExcept $ runStateT (typeCheck code) makePreprocessorState in
     handleTypeCheckError err
 
-handleTypeCheckError :: Either PreprocessorError (Code, PreprocessorState) -> IO PreprocessorOutput
-handleTypeCheckError (Left err) = do
+handleTypeCheckError :: Either (PreprocessorError, PreprocessorState) (Code, PreprocessorState) -> IO PreprocessorOutput
+handleTypeCheckError (Left (err, state)) = do
     putStrLn "Error in type checker"
     print err
+    printWarnings state
     exitFailure
 handleTypeCheckError (Right (ast, state)) = do
-    let PreprocessorState _ _ _ warnings _ = state
-    putStrLn "Warnings:"
-    putStrLn $ intercalate "\n" (fmap (codePrint 0) (reverse warnings))
+    printWarnings state
     return ast
+
+printWarnings :: PreprocessorState -> IO ()
+printWarnings state = do
+    putStrLn "Warnings:"
+    putStrLn $ intercalate "\n" (fmap (codePrint 0) (reverse (warnings state)))
 
 
 executeStage :: PreprocessorOutput -> IO ()
