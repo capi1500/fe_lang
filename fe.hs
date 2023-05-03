@@ -87,8 +87,8 @@ printWarnings state = do
 
 executeStage :: PreprocessorOutput -> IO ()
 executeStage code = do
-    -- out <- runExceptT $ runStateT (execute code) (makeExecutionState stackSize mainId)
-    -- handleExecutionError out
+    out <- runExceptT $ runStateT (execute code) makeExecutionState
+    handleExecutionError out
     return ()
 
 handleExecutionError :: Either ExecutionError ((), ExecutionState) -> IO ()

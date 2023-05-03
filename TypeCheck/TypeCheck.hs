@@ -116,7 +116,7 @@ instance TypeCheck A.Item Statement where
 
         assertType declaredType actualType p
         id <- addVariable identifier functionType Free
-        return $ NewFunctionStatement identifier ident expression' paramIds
+        return $ NewFunctionStatement ident expression' paramIds
 
     typeCheck (A.ItemStruct p ident lifetimes fields) = do
         throw $ Other "Not yet implemented" p
@@ -144,7 +144,7 @@ instance TypeCheck A.Item Statement where
 
         id <- addVariable identifier t variableState
         handleUsedVariables (transferOwnership id)
-        return $ NewVariableStatement identifier ident initialization'
+        return $ NewVariableStatement ident initialization'
 
 instance TypeCheck A.FunctionParam FunctionParam where
     typeCheck :: A.FunctionParam -> PreprocessorMonad FunctionParam
@@ -199,7 +199,8 @@ instance TypeCheck A.Expression TypedExpression where
             TypedExpression paramExpression paramType _ <- typeCheck param
             assertType paramType paramDeclaredType (hasPosition param)
             handleUsedVariables moveOutVariable
-            return paramExpression
+            let Identifier _ ident = paramIdent
+            return (ident, paramExpression)
         params' <- traverse paramCheck (zip declaredParams params)
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         return $ TypedExpression (CallExpression function' params') returnType staticLifetime
@@ -222,7 +223,7 @@ instance TypeCheck A.Expression TypedExpression where
         lifetime <- getShortestLifetimeOfUsedVariables p
         handleUsedVariables (borrowVariable referenceTempVariableId)
         markVariableUsed referenceTempVariableId
-        return $ TypedExpression (GetReferenceExpression e') t' lifetime
+        return $ TypedExpression e' t' lifetime
     typeCheck (A.UnaryExpression _ (A.ReferenceMut p) e) = do
         TypedExpression e' t _ <- typeCheck e
         let t' = TReference Mutable t
@@ -230,7 +231,7 @@ instance TypeCheck A.Expression TypedExpression where
         lifetime <- getShortestLifetimeOfUsedVariables p
         handleUsedVariables (borrowMutVariable referenceTempVariableId)
         markVariableUsed referenceTempVariableId
-        return $ TypedExpression (GetReferenceExpression e') t' lifetime
+        return $ TypedExpression e' t' lifetime
     typeCheck (A.LiteralExpression _ literal) = do
         typeCheck literal
     typeCheck (A.PlusExpression p e1 e2) = do

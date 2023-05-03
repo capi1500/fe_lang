@@ -7,9 +7,9 @@ fn fib(first: i32, second: i32, cur: i32, max: i32) -> i32 {
 }
 
 fn getNthFib(n: i32) -> i32 {
-	fib(0, 1, 0, n + 1)
+	fib(0, 1, 0, n)
 }
 
 fn main() -> i32 {
-	getNthFib(4)
+	getNthFib(6)
 }

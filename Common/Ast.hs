@@ -16,10 +16,11 @@ import TypeCheck.Variable (Lifetime)
 
 
 mainFunction :: Identifier
-mainFunction = Identifier Nothing (Ident "main")
+mainFunction = Identifier Nothing mainFunctionName
+mainFunctionName :: Ident
+mainFunctionName = Ident "main"
 
-newtype Pointer = Pointer Int
-  deriving (Eq, Ord, Show, Read)
+type Pointer = Int
 
 newtype Code = Code [Statement]
   deriving (Eq, Ord, Show, Read)
@@ -27,8 +28,8 @@ newtype Code = Code [Statement]
 data Statement =
     EmptyStatement |
     TypeStatement Type |
-    NewVariableStatement Identifier Ident Initialization |
-    NewFunctionStatement Identifier Ident Expression [Ident] |
+    NewVariableStatement Ident Initialization |
+    NewFunctionStatement Ident Expression [Ident] |
     ExpressionStatement TypedExpression
   deriving (Eq, Ord, Show, Read)
 
@@ -46,15 +47,13 @@ data Expression =
     -- MatchExpression Expression [MatchArm]
     LiteralExpression Value |
     MakeArrayExpression [Value] |
-    MoveExpression Expression | -- holds VMovedValue variableId
     VariableExpression Ident | -- variableId is valid for current frame
-    GetReferenceExpression Expression | -- makes reference out of identifier
     -- StructExpression Ident [StructExpressionField]
     -- ArrayExpressionItems [ArrayElement]
     -- ArrayExpressionDefault Expression Expression |
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
-    CallExpression Expression [Expression] |
+    CallExpression Expression [(Ident, Expression)] |
     -- IndexExpression Expression Expression |
     -- UnaryExpression UnaryOperator Expression |
     UnaryMinusExpression Expression |
@@ -105,7 +104,6 @@ data Value =
     VVariant Int Pointer | -- value_tag, value
     VFunction [Pointer] Expression | -- captures, code
     VArray Int [Pointer] | -- size, values
-    VMovedValue Pointer |
     VReference Pointer
   deriving (Eq, Ord, Show, Read)
 

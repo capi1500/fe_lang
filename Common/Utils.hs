@@ -6,7 +6,6 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.Maybe (isNothing)
 import Common.Printer
-
 type Identifier = Identifier' A.BNFC'Position
 data Identifier' a = Identifier a A.Ident
   deriving (Eq, Ord, Show, Read)

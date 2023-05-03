@@ -6,5 +6,5 @@ data ExecutionError =
     DivisionByZero BNFC'Position |
     ShiftInvalidArgument Int |
     Other String |
-    TypeCheckerFailed
+    TypeCheckerFailed String
   deriving (Eq, Ord, Show, Read)

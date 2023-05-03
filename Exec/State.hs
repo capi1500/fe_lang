@@ -1,37 +1,35 @@
 module Exec.State where
 
-import Control.Monad.State (StateT, get, put)
+import Data.Array
+import Control.Monad.State
 import Control.Monad.Except
+
 import Exec.Error
+
 import Common.Types
 import Common.Utils
 import Common.Ast
-import Data.Array (Array, array)
+import Common.Scope
+import Data.Map
+import Fe.Abs (Ident)
 
+type VariableId = Int
 
-data Variable = Variable (Maybe Value) | VariableUndefined
+data Variable = Variable Value | Uninitialized
   deriving (Eq, Ord, Show, Read)
 
-data ExecutionState = ExecutionState [Variable] Int
-  deriving (Eq, Ord, Show, Read)
+type VariableMappings = Scope (Map Ident VariableId)
+data ExecutionState = ExecutionState {
+    variableMappings :: VariableMappings,
+    variables :: [Variable]
+} deriving (Eq, Ord, Show, Read)
 
--- type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
+type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
 
--- makeExecutionState :: Int -> VariableId -> ExecutionState
--- makeExecutionState stackSize = ExecutionState
---         [VariableUndefined | i <- [0..stackSize]]
+makeExecutionState :: ExecutionState
+makeExecutionState  = ExecutionState (Global empty) []
 
--- addVariable :: VariableId -> Variable -> ExecutorMonad ()
--- addVariable id variable = do
---     ExecutionState stack mainId <- get
---     put $ ExecutionState (listSet id variable stack) mainId
-
--- getVariable :: VariableId -> ExecutorMonad Variable
--- getVariable id = do
---     ExecutionState stack mainId <- get
---     return $ listGet id stack
-
--- removeVariable :: VariableId -> ExecutorMonad ()
--- removeVariable id = do
---     ExecutionState stack mainId <- get
---     put $ ExecutionState (listSet id VariableUndefined stack) mainId
+putMappings :: VariableMappings -> ExecutorMonad ()
+putMappings mappings = do
+    ExecutionState _ variables <- get
+    put $ ExecutionState mappings variables
