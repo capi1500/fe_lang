@@ -23,8 +23,8 @@ instance CodePrint Expression where
     codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (\(_, _, e) -> codePrint tabs e) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
-        codePrint tabs onTrue ++
-        maybe "" (\onFalse -> printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
+        codePrint tabs onTrue ++ 
+        maybe "" (\onFalse -> "\n" ++ printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
     codePrint tabs (LiteralExpression value) = codePrint tabs value
     codePrint tabs (VariableExpression ident) = codePrint tabs ident
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2

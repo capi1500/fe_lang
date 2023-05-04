@@ -230,7 +230,7 @@ moveOutVariable id = do
     variable <- getVariableById id
 
     shouldMove <- internalShouldMove variable
-    if not (isDerefed variable) && not shouldMove then do return ()
+    if not shouldMove then do return ()
     else do
 
     addWarning $ Debug ("Moving out " ++ show id ++ " " ++ show (variableIdentifier variable))
@@ -260,9 +260,7 @@ transferOwnership newOwnerId movedOutId = do
     movedOut <- getVariableById movedOutId
 
     shouldMove <- internalShouldMove movedOut
-    if isDerefed movedOut then do 
-        moveOutVariable movedOutId
-    else if not shouldMove then do return ()
+    if not shouldMove then do return ()
     else do
 
     addWarning $ Debug ("Transfering " ++ show movedOutId ++ " to " ++ show newOwnerId)

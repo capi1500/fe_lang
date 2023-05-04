@@ -102,8 +102,8 @@ instance Executable Expression Value where
         v2 <- execute e2 >>= deref
         doBooleanDoubleOperator operator v1 v2
     execute (AssignmentExpression isRef e1 e2) = do
-        VReference v1 <- derefConditionally isRef (execute e1)
-        v2 <- execute e2
+        VReference v1 <- execute e1
+        v2 <- derefConditionally isRef (execute e2)
         setVariableById v1 v2
         printLocalScope
         return $ VReference v1

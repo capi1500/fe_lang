@@ -69,6 +69,3 @@ changeVariable variableState borrows borrowsMut (Variable variableIdentifier var
 
 borrowsMultiple :: Variable -> Bool
 borrowsMultiple var = length (borrows var) + length (borrowsMut var) > 1
-
-isDerefed :: Variable -> Bool
-isDerefed v = null (borrows v) && not (null (borrowsMut v)) && not (isReference (variableType v))

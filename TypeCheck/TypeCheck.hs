@@ -200,7 +200,7 @@ instance TypeCheck A.Expression TypedExpression where
             assertType paramType paramDeclaredType (hasPosition param)
             handleUsedVariables moveOutVariable
             let Identifier _ ident = paramIdent
-            return (ident, isReference paramType, paramExpression)
+            return (ident, not (isReference paramType), paramExpression)
         params' <- traverse paramCheck (zip declaredParams params)
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         return $ TypedExpression (CallExpression function' params') returnType staticLifetime False
@@ -214,17 +214,7 @@ instance TypeCheck A.Expression TypedExpression where
         assertType t boolType (hasPosition e)
         handleUsedVariables moveOutVariable
         return $ TypedExpression (UnaryNegationExpression e') boolType staticLifetime False
-    typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
-        TypedExpression e' t l _ <- typeCheck e
-        unless (isReference t) $ throw (CannotDerefNotReference p t)
-        let TReference mutable innerT = t
-        tempVariableId <- addTemporaryVariable p (isConstReference t) innerT
-        handleUsedVariables (transferOwnership tempVariableId)
-        markVariableUsed tempVariableId
-        var <- getVariableById tempVariableId
-        printUsedVariables "Deref: "
-        printVariables
-        return $ TypedExpression e' innerT l (not (borrowsMultiple var))
+    -- typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         TypedExpression e' t l _ <- typeCheck e
         let t' = TReference Const t
@@ -353,7 +343,7 @@ makeAssignmentOperatorExpression (A.Assign p) e1 e2 = do
     mutateVariableById assignedVariable (setVariableState Free)
     printVariables
 
-    return $ TypedExpression (AssignmentExpression (isDerefed var) e1' e2') t1 staticLifetime False
+    return $ TypedExpression (AssignmentExpression True e1' e2') t1 staticLifetime False
 
 makeAssignmentOperatorExpression' :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
 makeAssignmentOperatorExpression' op e1 e2 = do
