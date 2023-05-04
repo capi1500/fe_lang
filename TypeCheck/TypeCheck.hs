@@ -214,8 +214,9 @@ instance TypeCheck A.Expression TypedExpression where
         assertType t boolType (hasPosition e)
         handleUsedVariables moveOutVariable
         return $ TypedExpression (UnaryNegationExpression e') boolType staticLifetime False
-    -- typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
-    --     throw $ Other "Not yet implemented" (hasPosition x)
+    typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
+        TypedExpression e' t l _ <- typeCheck e
+        throw $ Other "Not yet implemented" p
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         TypedExpression e' t l _ <- typeCheck e
         let t' = TReference Const t
