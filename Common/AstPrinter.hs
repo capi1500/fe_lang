@@ -16,7 +16,7 @@ instance CodePrint Statement where
     codePrint tabs (ExpressionStatement expr) = codePrint tabs expr ++ "\n"
 
 instance CodePrint TypedExpression where
-    codePrint tabs (TypedExpression expr t l) = codePrint tabs expr
+    codePrint tabs (TypedExpression expr _ _ _) = codePrint tabs expr
 
 instance CodePrint Expression where
     codePrint tabs (BlockExpression statements) = "{\n" ++ printTabs (tabs + 1) ++ intercalate (printTabs (tabs + 1)) (fmap (codePrint (tabs + 1)) statements) ++ printTabs tabs ++ "}"

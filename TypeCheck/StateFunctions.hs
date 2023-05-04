@@ -20,6 +20,7 @@ import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.Variable
 import Common.Ast
+import qualified Fe.Abs as A
 
 makeNewFrame :: Variables -> Variables
 makeNewFrame (Variables (Global global) variables) = Variables (Local (Global global) empty) variables
@@ -93,22 +94,23 @@ getLocalVariable (Identifier _ ident) = do
         return (id, listGet id variables)
 
 -- does not change lifetimes, takes it from the environment
-addVariable :: Identifier -> Type -> VariableState -> PreprocessorMonad VariableId
-addVariable identifier t variableState = do
+addVariable :: Identifier -> Bool -> Type -> VariableState -> PreprocessorMonad VariableId
+addVariable identifier isConst t variableState = do
     id <- checkShadowing identifier
-    internalAddVariable identifier t variableState id
+    internalAddVariable identifier isConst t variableState id
 
 -- does not change lifetimes, takes it from the environment
 addTemporaryVariable :: BNFC'Position -> Type -> PreprocessorMonad VariableId
 addTemporaryVariable p t = do
-    internalAddVariable (Identifier p (Ident "temporary")) t Free Nothing
+    internalAddVariable (Identifier p (Ident "temporary")) True t Free Nothing
 
-internalAddVariable :: Identifier -> Type -> VariableState -> Maybe VariableId -> PreprocessorMonad VariableId
-internalAddVariable identifier t variableState id = do
+internalAddVariable :: Identifier -> Bool -> Type -> VariableState -> Maybe VariableId -> PreprocessorMonad VariableId
+internalAddVariable identifier isConst t variableState id = do
     variables <- gets variables
     lifetime <- getLifetime
     let variable = Variable {
         variableIdentifier = identifier,
+        variableIsConst = isConst,
         variableType = t,
         variableState = variableState,
         borrows = [],
@@ -188,8 +190,8 @@ reproduceWithPersistent p state = do
     when (isJust maybeVar) $ do
         let template = fromJust maybeVar
         tempVar <- addTemporaryVariable p (variableType template)
-        traverse_ (borrowVariable tempVar) (borrows template)
-        traverse_ (borrowMutVariable tempVar) (borrowsMut template)
+        traverse_ (borrowVariable p tempVar) (borrows template)
+        traverse_ (borrowMutVariable p tempVar) (borrowsMut template)
         markVariableUsed tempVar
 
     LifetimeState lifetime _ <- gets lifetimeState
@@ -206,7 +208,7 @@ checkShadowing identifier = do
         (i, _) <- maybeVar
         Just i
   where
-    shadowingOk (_, Variable _ t variableState _ _ _) =
+    shadowingOk (_, Variable _ _ t variableState _ _ _) =
         isFunction t && variableState == Uninitialized
 
 markVariableUsed :: VariableId -> PreprocessorMonad ()
@@ -297,33 +299,33 @@ internalShouldMove variable = do
         else do
             return True
 
-borrowVariable :: VariableId -> VariableId -> PreprocessorMonad ()
-borrowVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
+borrowVariable :: A.BNFC'Position -> VariableId -> VariableId -> PreprocessorMonad ()
+borrowVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
   where
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
-    markAsBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
+    markAsBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
         state' <- if state == Free then do
                 return $ Borrowed (singleton borrowerId)
         else if isBorrowed state then do
                 let Borrowed whatBorrows = state
                 return $ Borrowed (Data.Set.insert borrowerId whatBorrows)
         else do
-            throw (CannotBorrow borrowerId ident)
-        return $ Variable ident t state' borrows borrowsMut lifetime
+            throw (AlreadyBorrowed borrowerId p)
+        return $ Variable ident const t state' borrows borrowsMut lifetime
     addBorrowed :: Variable -> PreprocessorMonad Variable
-    addBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
-        return $ Variable ident t state (listPushBack borrowedId borrows) borrowsMut lifetime
+    addBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
+        return $ Variable ident const t state (listPushBack borrowedId borrows) borrowsMut lifetime
 
-borrowMutVariable :: VariableId -> VariableId -> PreprocessorMonad ()
-borrowMutVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
+borrowMutVariable :: A.BNFC'Position -> VariableId -> VariableId -> PreprocessorMonad ()
+borrowMutVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
   where
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
-    markAsBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
-        unless (state == Free) $ throw (CannotBorrow borrowerId ident)
-        return $ Variable ident t (BorrowedMut borrowerId) borrows borrowsMut lifetime
+    markAsBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
+        unless (state == Free) $ throw (AlreadyBorrowed borrowerId p)
+        return $ Variable ident const t (BorrowedMut borrowerId) borrows borrowsMut lifetime
     addBorrowed :: Variable -> PreprocessorMonad Variable
-    addBorrowed (Variable ident t state borrows borrowsMut lifetime) = do
-        return $ Variable ident t state borrows (listPushBack borrowedId borrowsMut) lifetime
+    addBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
+        return $ Variable ident const t state borrows (listPushBack borrowedId borrowsMut) lifetime
 
 borrowInternal :: VariableId -> VariableId -> (Variable -> PreprocessorMonad Variable) -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
 borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed = do

@@ -10,7 +10,7 @@ import Common.Utils
 import Common.Scope
 import Exec.State
 import Data.Maybe
-import Common.Ast (Pointer)
+import Common.Ast
 
 addVariable :: Ident -> Variable -> ExecutorMonad Pointer
 addVariable ident variable = do
@@ -45,6 +45,11 @@ getVariableById :: Pointer -> ExecutorMonad Variable
 getVariableById id = do
   variables <- gets variables
   return $ listGet id variables
+
+setVariableById :: Pointer -> Value -> ExecutorMonad ()
+setVariableById id value = do
+  variables <- gets variables
+  putVariables (listSet id (Variable value) variables)
 
 removeVariable :: Ident -> ExecutorMonad ()
 removeVariable ident = do

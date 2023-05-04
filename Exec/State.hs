@@ -33,3 +33,8 @@ putMappings :: VariableMappings -> ExecutorMonad ()
 putMappings mappings = do
     ExecutionState _ variables <- get
     put $ ExecutionState mappings variables
+
+putVariables :: [Variable] -> ExecutorMonad ()
+putVariables variables = do
+    ExecutionState mappings _ <- get
+    put $ ExecutionState mappings variables

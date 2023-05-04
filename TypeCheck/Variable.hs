@@ -27,6 +27,7 @@ data Lifetime = Lifetime [Int] Int -- lifetime predecessors ids list, (where beg
 
 data Variable = Variable {
     variableIdentifier :: Identifier,
+    variableIsConst :: Bool,
     variableType :: Type,
     variableState :: VariableState,
     borrows :: [VariableId],
@@ -39,7 +40,7 @@ isBorrowed (Borrowed _) = True
 isBorrowed _ = False
 
 instance CodePrint Variable where
-  codePrint tabs (Variable (Identifier p value) t state borrows borrowsMut lifetime) =
+  codePrint tabs (Variable (Identifier p value) const t state borrows borrowsMut lifetime) =
     let Lifetime list _ = lifetime in
     printTabs tabs ++ "{\n" ++
     printTabs (tabs + 1) ++ show value ++ ": " ++ codePrint tabs t ++ "\n" ++
@@ -51,17 +52,17 @@ instance CodePrint Variable where
 
 
 setVariableState :: VariableState -> Variable -> Variable
-setVariableState variableState (Variable variableIdentifier variableType _ borrows borrowsMut lifetime) =
-    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+setVariableState variableState (Variable variableIdentifier variableType const _ borrows borrowsMut lifetime) =
+    Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime
 
 setVariableBorrows :: [VariableId] -> Variable -> Variable
-setVariableBorrows borrows (Variable variableIdentifier variableType variableState _ borrowsMut lifetime) =
-    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+setVariableBorrows borrows (Variable variableIdentifier variableType const variableState _ borrowsMut lifetime) =
+    Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime
 
 setVariableBorrowsMut :: [VariableId] -> Variable -> Variable
-setVariableBorrowsMut borrowsMut (Variable variableIdentifier variableType variableState borrows _ lifetime) =
-    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+setVariableBorrowsMut borrowsMut (Variable variableIdentifier variableType const variableState borrows _ lifetime) =
+    Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime
 
 changeVariable :: VariableState -> [VariableId] -> [VariableId] -> Variable -> Variable
-changeVariable variableState borrows borrowsMut (Variable variableIdentifier variableType _ _ _ lifetime) =
-    Variable variableIdentifier variableType variableState borrows borrowsMut lifetime
+changeVariable variableState borrows borrowsMut (Variable variableIdentifier variableType const _ _ _ lifetime) =
+    Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime

@@ -50,7 +50,7 @@ instance Executable Statement Value where
         let value = Variable $ VFunction [] expression
         addVariable ident value
         return VUnit
-    execute (ExpressionStatement (TypedExpression expression _ _)) = do
+    execute (ExpressionStatement (TypedExpression expression _ _ _)) = do
         execute expression
 
 instance Executable Initialization Variable where
@@ -100,10 +100,11 @@ instance Executable Expression Value where
         v1 <- execute e1 >>= deref
         v2 <- execute e2 >>= deref
         doBooleanDoubleOperator operator v1 v2
-    -- execute (AssignmentExpression isRef e1 e2) = do
-    --     v1 <- execute e1
-    --     v2 <- execute e2
-    --     return v1 -- TODO
+    execute (AssignmentExpression isRef e1 e2) = do
+        VReference v1 <- execute e1
+        v2 <- derefConditionally isRef (execute e2)
+        setVariableById v1 v2
+        return $ VReference v1
     execute _ = do
         throwError $ Other "Not yet implemented"
 

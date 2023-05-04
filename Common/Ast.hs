@@ -36,7 +36,7 @@ data Statement =
 data Initialization = VarInitialized Expression | VarUninitialized
   deriving (Eq, Ord, Show, Read)
 
-data TypedExpression = TypedExpression Expression Type Lifetime -- expression, type of expression, lifetime of value that the expression holds
+data TypedExpression = TypedExpression Expression Type Lifetime Bool -- expression, type of expression, lifetime of value that the expression holds, isPlaceExpression
   deriving (Eq, Ord, Show, Read)
 
 data Expression =
