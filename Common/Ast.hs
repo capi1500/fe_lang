@@ -28,7 +28,7 @@ newtype Code = Code [Statement]
 data Statement =
     EmptyStatement |
     TypeStatement Type |
-    NewVariableStatement Ident Initialization |
+    NewVariableStatement Ident Bool Initialization | -- ident, is_reference, init
     NewFunctionStatement Ident Expression [Ident] |
     ExpressionStatement TypedExpression
   deriving (Eq, Ord, Show, Read)
@@ -53,19 +53,19 @@ data Expression =
     -- ArrayExpressionDefault Expression Expression |
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
-    CallExpression Expression [(Ident, Expression)] |
+    CallExpression Expression [(Ident, Bool, Expression)] | -- ident, is_reference, expression
     -- IndexExpression Expression Expression |
     -- UnaryExpression UnaryOperator Expression |
     UnaryMinusExpression Expression |
     UnaryNegationExpression Expression |
     -- TypeCastExpression Expression (Type) |
     I32DoubleOperatorExpression NumericDoubleOperator Expression Expression |
-    BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression
+    BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression |
     -- ComparisonExpression Expression ComparisonOperator Expression |
     -- LazyAndExpression Expression Expression |
     -- LazyOrExpression Expression Expression |
     -- RangeExpression Expression Expression |
-    -- AssignmentExpression Expression AssignmentOperator Expression |
+    AssignmentExpression Bool Expression Expression -- isRef, expression1, expression2 (TODO: maybe isRef should be stored in variable in exec)
     -- BreakExpression |
     -- ContinueExpression |
     -- ReturnExpressionUnit |

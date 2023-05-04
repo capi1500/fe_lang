@@ -68,6 +68,9 @@ addToScope (A.ItemFunction p ident lifetimes params returnType _) = do
             params'
             declaredReturnType
     addVariable identifier t Uninitialized
+    Variables _ variables <- gets variables
+    let A.Ident name = ident
+    addWarning $ Debug ("Added item " ++ name ++ ": [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]")
     return ()
 addToScope (A.ItemStruct p ident lifetimes fields) = do
     throw $ Other "Not yet implemented" p
@@ -83,8 +86,6 @@ instance TypeCheck A.Statement Statement where
         return EmptyStatement
     typeCheck (A.ItemStatement p item) = do
         addToScope item
-        Variables _ variables <- gets variables
-        addWarning $ Debug ("Added item " ++ nameOfItem item ++ ": [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]")
         typeCheck item
     typeCheck (A.ExpressionStatement p expression) = do
         expression' <- typeCheck expression
@@ -144,7 +145,10 @@ instance TypeCheck A.Item Statement where
 
         id <- addVariable identifier t variableState
         handleUsedVariables (transferOwnership id)
-        return $ NewVariableStatement ident initialization'
+        Variables _ variables <- gets variables
+        let A.Ident name = ident
+        addWarning $ Debug ("Added item " ++ name ++ ": [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]")
+        return $ NewVariableStatement ident (isReference t) initialization'
 
 instance TypeCheck A.FunctionParam FunctionParam where
     typeCheck :: A.FunctionParam -> PreprocessorMonad FunctionParam
@@ -178,7 +182,8 @@ instance TypeCheck A.Expression TypedExpression where
                 ExpressionStatement (TypedExpression _ t l) -> (t, l, hasPosition (last statements))
                 _ -> (unitType, staticLifetime, Nothing)
         -- TODO: this should not restrict to the static lifetime, see multiple_variables_on_write as a counterexample
-        unless (isSubLifetime actualLifetime staticLifetime) $ do throw (LifetimesMismatch Nothing lastPosition staticLifetime actualLifetime)
+        currentLifetime <- getLifetime
+        unless (isSubLifetime actualLifetime currentLifetime) $ do throw (LifetimesMismatch Nothing lastPosition currentLifetime actualLifetime)
         return $ TypedExpression (BlockExpression statements') t actualLifetime
     typeCheck (A.GroupedExpression _ expression) = do
         typeCheck expression
@@ -200,7 +205,7 @@ instance TypeCheck A.Expression TypedExpression where
             assertType paramType paramDeclaredType (hasPosition param)
             handleUsedVariables moveOutVariable
             let Identifier _ ident = paramIdent
-            return (ident, paramExpression)
+            return (ident, isReference paramType, paramExpression)
         params' <- traverse paramCheck (zip declaredParams params)
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         return $ TypedExpression (CallExpression function' params') returnType staticLifetime
@@ -235,34 +240,37 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.LiteralExpression _ literal) = do
         typeCheck literal
     typeCheck (A.PlusExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 Plus p
+        makeI32DoubleOperatorExpression e1 e2 Plus
     typeCheck (A.MinusExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 Minus p
+        makeI32DoubleOperatorExpression e1 e2 Minus
     typeCheck (A.MultiplyExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 Multiply p
+        makeI32DoubleOperatorExpression e1 e2 Multiply
     typeCheck (A.DivideExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 Divide p
+        makeI32DoubleOperatorExpression e1 e2 Divide
     typeCheck (A.ModuloExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 Modulo p
+        makeI32DoubleOperatorExpression e1 e2 Modulo
     typeCheck (A.LShiftExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 LShift p
+        makeI32DoubleOperatorExpression e1 e2 LShift
     typeCheck (A.RShiftExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 RShift p
+        makeI32DoubleOperatorExpression e1 e2 RShift
     typeCheck (A.BitOrExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 BitOr p
+        makeI32DoubleOperatorExpression e1 e2 BitOr
     typeCheck (A.BitXOrExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 BitXor p
+        makeI32DoubleOperatorExpression e1 e2 BitXor
     typeCheck (A.BitAndExpression p e1 e2) = do
-        makeI32DoubleOperatorExpression e1 e2 BitAnd p
+        makeI32DoubleOperatorExpression e1 e2 BitAnd
     typeCheck (A.ComparisonExpression _ e1 operator e2) = do
-        e <- makeComparisonOperatorExpression operator e1 e2
-        handleUsedVariables moveOutVariable
-        return e
+        throw $ Other "Not yet implemented" (hasPosition operator)
+        -- e <- makeComparisonOperatorExpression operator e1 e2
+        -- handleUsedVariables moveOutVariable
+        -- return e
+    typeCheck (A.AssignmentExpression _ e1 operator e2) = do
+        makeAssignmentOperatorExpression operator e1 e2
     typeCheck x = do
         throw $ Other "Not yet implemented" (hasPosition x)
 
-makeI32DoubleOperatorExpression :: A.Expression -> A.Expression -> NumericDoubleOperator -> A.BNFC'Position -> PreprocessorMonad TypedExpression
-makeI32DoubleOperatorExpression e1 e2 operator p = do
+makeI32DoubleOperatorExpression :: A.Expression -> A.Expression -> NumericDoubleOperator  -> PreprocessorMonad TypedExpression
+makeI32DoubleOperatorExpression e1 e2 operator = do
     TypedExpression e1' t1 _ <- typeCheck e1
     TypedExpression e2' t2 _ <- typeCheck e2
     assertType t1 i32Type (hasPosition e1)
@@ -298,17 +306,48 @@ makeI32ComparisonExpression e1 e2 operator = do
     assertType t2 i32Type (hasPosition e2)
     return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') boolType staticLifetime
 
+makeAssignmentOperatorExpression :: A.AssignmentOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
+makeAssignmentOperatorExpression (A.PlusEqual p) e1 e2 = do makeAssignmentOperatorExpression' Plus e1 e2
+makeAssignmentOperatorExpression (A.MinusEqual p) e1 e2 = do makeAssignmentOperatorExpression' Minus e1 e2
+makeAssignmentOperatorExpression (A.MultiplyEqual p) e1 e2 = do makeAssignmentOperatorExpression' Multiply e1 e2
+makeAssignmentOperatorExpression (A.DivideEqual p) e1 e2 = do makeAssignmentOperatorExpression' Divide e1 e2
+makeAssignmentOperatorExpression (A.ModuloEqual p) e1 e2 = do makeAssignmentOperatorExpression' Modulo e1 e2
+makeAssignmentOperatorExpression (A.AndEqual p) e1 e2 = do makeAssignmentOperatorExpression' BitAnd e1 e2
+makeAssignmentOperatorExpression (A.OrEqual p) e1 e2 = do makeAssignmentOperatorExpression' BitOr e1 e2
+makeAssignmentOperatorExpression (A.XorEqual p) e1 e2 = do makeAssignmentOperatorExpression' BitXor e1 e2
+makeAssignmentOperatorExpression (A.LShiftEqual p) e1 e2 = do makeAssignmentOperatorExpression' LShift e1 e2
+makeAssignmentOperatorExpression (A.RShiftEqual p) e1 e2 = do makeAssignmentOperatorExpression' RShift e1 e2
+makeAssignmentOperatorExpression (A.Assign p) e1 e2 = do
+    throw $ Other "Not yet implemented" p
+    -- TypedExpression e1' t1 _ <- typeCheck e1
+    -- l1 <- getShortestLifetimeOfUsedVariables p
+    -- leftTempVariableId <- addTemporaryVariable p t1
+    -- handleUsedVariables (borrowMutVariable leftTempVariableId)
+    -- TypedExpression e2' t2 _ <- typeCheck e2
+    -- l2 <- getShortestLifetimeOfUsedVariables p
+    -- rightTempVariableId <- addTemporaryVariable p t2
+    -- handleUsedVariables (borrowMutVariable rightTempVariableId)
+    -- assertType t1 t2 p
+    -- return $ TypedExpression (AssignmentExpression False e1' e2') unitType staticLifetime
+
+makeAssignmentOperatorExpression' :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
+makeAssignmentOperatorExpression' op e1 e2 = do
+    throw $ Other "Not yet implemented" (hasPosition e1)
+    -- TypedExpression e1' t _ <- typeCheck e1
+    -- TypedExpression e2' t _ <- typeCheck e2
+    -- return $ TypedExpression (AssignmentExpression False e1' (I32DoubleOperatorExpression op e1' e2')) unitType staticLifetime
+
 instance TypeCheck A.IfExpression TypedExpression where
     typeCheck :: A.IfExpression -> PreprocessorMonad TypedExpression
     typeCheck (A.If p condition onTrue) =
-        helper condition onTrue (A.BlockExpression p [])
+        ifExpression condition onTrue (A.BlockExpression p [])
     typeCheck (A.IfElse p condition onTrue onFalse) =
-        helper condition onTrue onFalse
+        ifExpression condition onTrue onFalse
     typeCheck (A.IfElseIf p condition onTrue onFalse) =
-        helper condition onTrue onFalse
+        ifExpression condition onTrue onFalse
 
-helper :: (TypeCheck a TypedExpression, HasPosition a) => A.Expression -> A.Expression -> a -> PreprocessorMonad TypedExpression
-helper condition onTrue onFalse = do
+ifExpression :: (TypeCheck a TypedExpression, HasPosition a) => A.Expression -> A.Expression -> a -> PreprocessorMonad TypedExpression
+ifExpression condition onTrue onFalse = do
     TypedExpression condition' conditionType _ <- typeCheck condition
     assertType conditionType boolType (hasPosition condition)
     handleUsedVariables moveOutVariable

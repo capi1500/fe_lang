@@ -1,4 +1,6 @@
-fn main() {
+fn main() -> i32 {
 	var x = 5;
 	var y = x;
+	var z = x;
+	y + y + z + z
 }

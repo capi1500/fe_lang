@@ -26,16 +26,12 @@ struct Foo<'a, 'b> {
 	y: &'b i32,
 }
 
-fn i_helper<'a, 'b>(x: &'a i32, y: &'b i32) -> Foo<'a, 'b> {
-	Foo { x: y, y: x }
-}
-
-fn i() {
-	let x = 5;
-	let y = 4;
-	let foo = i_helper(&x, &y);
-	println!("{} {}", foo.x, foo.y);
-}
+// fn i() {
+// 	let x = 5;
+// 	let y = 4;
+// 	let foo = i_helper(&x, &y);
+// 	println!("{} {}", foo.x, foo.y);
+// }
 
 fn j() {
 	struct Foo {
@@ -49,6 +45,14 @@ fn j() {
 	println!("{}", foo());
 }
 
+fn k() {
+	let mut x1 = 1;
+	let mut x2 = 2;
+	let mut z = if true { &mut x1 } else { &mut x2 };
+	let mut tmp = &mut x1;
+	println!("{}", z);
+}
+
 fn main() {
-	i();
+	k();
 }

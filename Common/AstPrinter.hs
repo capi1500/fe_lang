@@ -10,8 +10,8 @@ instance CodePrint Code where
 instance CodePrint Statement where
     codePrint tabs EmptyStatement = ";\n"
     codePrint tabs (TypeStatement t) = printTabs tabs ++ show t
-    codePrint tabs (NewVariableStatement id (VarInitialized expr)) = "let " ++ codePrint tabs id ++ " = " ++ codePrint tabs expr ++ ";\n"
-    codePrint tabs (NewVariableStatement id VarUninitialized) = "let " ++ codePrint tabs id ++ ";\n"
+    codePrint tabs (NewVariableStatement id _ (VarInitialized expr)) = "let " ++ codePrint tabs id ++ " = " ++ codePrint tabs expr ++ ";\n"
+    codePrint tabs (NewVariableStatement id _ VarUninitialized) = "let " ++ codePrint tabs id ++ ";\n"
     codePrint tabs (NewFunctionStatement id expr params) = "fn " ++ codePrint tabs id ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ") " ++ codePrint tabs expr ++ "\n"
     codePrint tabs (ExpressionStatement expr) = codePrint tabs expr ++ "\n"
 
@@ -20,7 +20,7 @@ instance CodePrint TypedExpression where
 
 instance CodePrint Expression where
     codePrint tabs (BlockExpression statements) = "{\n" ++ printTabs (tabs + 1) ++ intercalate (printTabs (tabs + 1)) (fmap (codePrint (tabs + 1)) statements) ++ printTabs tabs ++ "}"
-    codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (\(_, e) -> codePrint tabs e) params) ++ ")"
+    codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (\(_, _, e) -> codePrint tabs e) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
         codePrint tabs onTrue ++

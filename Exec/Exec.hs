@@ -42,8 +42,8 @@ instance Executable Statement Value where
         return VUnit
     execute (TypeStatement t) = do
         throwError $ Other "Not yet implemented"
-    execute (NewVariableStatement ident initialization) = do
-        value <- execute initialization
+    execute (NewVariableStatement ident isRef initialization) = do
+        value <- execute initialization >>= derefVariable isRef
         addVariable ident value
         return VUnit
     execute (NewFunctionStatement ident expression paramIdents) = do
@@ -83,29 +83,27 @@ instance Executable Expression Value where
     execute (LiteralExpression value) = do
         return value
     execute (CallExpression function_object params) = do
-        function_pointer <- execute function_object
-        params' <- traverse (\(i, e) -> do
-            x <- execute e
-            x' <- deref x
-            return (i, x')) params
-        VFunction _ code <- deref function_pointer
+        VFunction _ code <- execute function_object >>= deref
+        params' <- traverse (\(i, isRef, e) -> do
+            x <- derefConditionally isRef (execute e)
+            return (i, x)) params
         inNewScope $ do
             traverse_ (\(paramIdent, paramValue) -> do
                 addVariable paramIdent (Variable paramValue))
                 params'
             execute code
     execute (I32DoubleOperatorExpression operator e1 e2) = do
-        v1 <- execute e1
-        v2 <- execute e2
-        v1' <- deref v1
-        v2' <- deref v2
-        doNumericDoubleOperator operator v1' v2'
+        v1 <- execute e1 >>= deref
+        v2 <- execute e2 >>= deref
+        doNumericDoubleOperator operator v1 v2
     execute (BoolDoubleOperatorExpression operator e1 e2) = do
-        v1 <- execute e1
-        v2 <- execute e2
-        v1' <- deref v1
-        v2' <- deref v2
-        doBooleanDoubleOperator operator v1' v2'
+        v1 <- execute e1 >>= deref
+        v2 <- execute e2 >>= deref
+        doBooleanDoubleOperator operator v1 v2
+    -- execute (AssignmentExpression isRef e1 e2) = do
+    --     v1 <- execute e1
+    --     v2 <- execute e2
+    --     return v1 -- TODO
     execute _ = do
         throwError $ Other "Not yet implemented"
 
