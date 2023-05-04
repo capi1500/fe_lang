@@ -1,0 +1,40 @@
+fn main() -> i32 {
+    var x = 1;
+    var y = &mut x;
+    *y = 4;
+    x
+}
+/*
+Warning: Assignment left: Just 4
+Warning: Variables: [
+1:         {
+            Ident "x": I32
+            BorrowedMut 4
+            borrows: 
+            borrowsMut: 
+            lifetime: 0,2,3
+        },
+4:         {
+            Ident "temporary": I32
+            Free
+            borrows: 
+            borrowsMut: 1
+            lifetime: 0,2,3
+        }]
+Warning: Assignment Right: Nothing
+Warning: Variables: [
+1:         {
+            Ident "x": I32
+            BorrowedMut 4
+            borrows: 
+            borrowsMut: 
+            lifetime: 0,2,3
+        },
+4:         {
+            Ident "temporary": I32
+            Free
+            borrows: 
+            borrowsMut: 1
+            lifetime: 0,2,3
+        }]
+*/

@@ -45,14 +45,36 @@ fn j() {
 	println!("{}", foo());
 }
 
+// fn k() {
+// 	let mut x1 = 1;
+// 	let mut x2 = 2;
+// 	let mut z = if true { &mut x1 } else { &mut x2 };
+// 	let mut tmp = &mut x1;
+// 	println!("{}", z);
+// }
+
 fn k() {
 	let mut x1 = 1;
 	let mut x2 = 2;
-	let mut z = if true { &mut x1 } else { &mut x2 };
-	let mut tmp = &mut x1;
+	let mut x3 = 3;
+	let mut y1 = &mut x1;
+	let mut y2 = &mut x2;
+	// *(if true { y1 } else { y2 }) = x3;
+	*(if true { &mut y1 } else { &mut y2 }) = &mut x3;
+	x3 = 4;
+	// println!("{}", y1);
+	// println!("{}", y2);
+	println!("{} {}", x1, x2);
+}
+
+fn l() {
+	let mut x = 1;
+	let mut y = 2;
+	let mut z = &mut x;
+	*(&mut z) = &mut y;
 	println!("{}", z);
 }
 
 fn main() {
-	k();
+	l();
 }

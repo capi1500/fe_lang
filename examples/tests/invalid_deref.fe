@@ -1,0 +1,6 @@
+fn main() -> i32 {
+    var x = 1;
+    var y = &mut x;
+    *(&mut x) = 4;
+    x
+}
