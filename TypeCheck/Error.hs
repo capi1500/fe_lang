@@ -26,7 +26,8 @@ data PreprocessorError =
     CannotMakeEmptyReference BNFC'Position |
     InitializeConstantAsMutable Identifier Type |
     WrongNumberOfParams BNFC'Position Type |
-    Other String BNFC'Position
+    Other String BNFC'Position |
+    Fatal String
   deriving (Eq, Ord, Show, Read)
 
 data PreprocessorWarning =

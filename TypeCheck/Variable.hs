@@ -38,9 +38,6 @@ isBorrowed :: VariableState -> Bool
 isBorrowed (Borrowed _) = True
 isBorrowed _ = False
 
-instance CodePrint Type where
-    codePrint _ t = show t
-
 instance CodePrint Variable where
   codePrint tabs (Variable (Identifier p value) t state borrows borrowsMut lifetime) =
     let Lifetime list _ = lifetime in

@@ -9,7 +9,7 @@ import Data.Foldable (traverse_)
 import Control.Monad.State
 import Control.Monad.Except
 
-import Fe.Abs (Ident (Ident), BNFC'Position)
+import Fe.Abs (Ident (Ident), BNFC'Position, HasPosition (hasPosition))
 
 import Common.Scope
 import Common.Utils
@@ -19,6 +19,7 @@ import Common.Printer
 import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.Variable
+import Common.Ast
 
 makeNewFrame :: Variables -> Variables
 makeNewFrame (Variables (Global global) variables) = Variables (Local (Global global) empty) variables
@@ -118,7 +119,6 @@ internalAddVariable identifier t variableState id = do
   where
     helper (Identifier _ ident) variable (Variables (Global mappings) variables) maybeId = do
         state <- get
-        let id = fromMaybe
         let (id, variables') = if isJust maybeId then
                 let x = fromJust maybeId in
                 (x, listSet x variable variables)
@@ -151,7 +151,8 @@ inNewFrame p f = do
     putVariables $ makeNewFrame (variables state)
     putTypeDefinitions $ Local (typeDefinitions state) Data.Map.empty
     ret' <- f
-    reproduceWithPersistent state
+    clearUsedVariables
+    reproduceWithPersistent p state
     return ret'
 
 inNewScope :: BNFC'Position -> PreprocessorMonad a -> PreprocessorMonad a
@@ -161,19 +162,35 @@ inNewScope p f = do
     let Variables mappings container = variables state
     putVariables $ Variables (Local mappings empty) container
     putTypeDefinitions $ Local (typeDefinitions state) Data.Map.empty
-    ret' <- f
-    reproduceWithPersistent state
-    return ret'
+    ret <- f
+    reproduceWithPersistent p state
+    return ret
 
-reproduceWithPersistent :: PreprocessorState -> PreprocessorMonad ()
-reproduceWithPersistent state = do
+reproduceWithPersistent :: BNFC'Position -> PreprocessorState -> PreprocessorMonad ()
+reproduceWithPersistent p state = do
+    usedVariables <- gets usedVariables
+    maybeVar <- if isJust usedVariables then do
+            let usedId = fromJust usedVariables
+            var <- getVariableById usedId 
+            return $ Just var
+        else do
+            return Nothing
+
     variables <- gets variables
     let Variables (Local _ map) _ = variables
     traverse_ moveOutVariable (reverse (elems map))
 
     warnings <- gets warnings
     LifetimeState _ id <- gets lifetimeState
+
     put state
+
+    when (isJust maybeVar) $ do
+        let template = fromJust maybeVar
+        tempVar <- addTemporaryVariable p (variableType template)
+        traverse_ (borrowVariable tempVar) (borrows template)
+        traverse_ (borrowMutVariable tempVar) (borrowsMut template)
+        markVariableUsed tempVar
 
     LifetimeState lifetime _ <- gets lifetimeState
     putWarnings warnings
@@ -195,12 +212,15 @@ checkShadowing identifier = do
 markVariableUsed :: VariableId -> PreprocessorMonad ()
 markVariableUsed id = do
     PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings (listPushBack id usedVariables)
+    when (isJust usedVariables) $ do
+        printVariables
+        throw (Fatal ("Marking variable " ++ show id ++ " as used, when another variable is used " ++ show (fromJust usedVariables)))
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings (Just id)
 
 handleUsedVariables :: (VariableId -> PreprocessorMonad ()) -> PreprocessorMonad ()
 handleUsedVariables handler = do
     usedVariables <- gets usedVariables
-    traverse_ handler (reverse usedVariables)
+    traverse_ handler usedVariables
     clearUsedVariables
 
 moveOutVariable :: VariableId -> PreprocessorMonad ()
@@ -241,6 +261,8 @@ transferOwnership newOwnerId movedOutId = do
     if not shouldMove then do return ()
     else do
 
+    addWarning $ Debug ("Transfering " ++ show movedOutId ++ " to " ++ show newOwnerId)
+
     newOwnerBorrows <- foldM (transferBorrow newOwnerId movedOutId) (borrows newOwner) (borrows movedOut)
     newOwnerBorrowsMut <- foldM (transferMutBorrow newOwnerId) (borrowsMut newOwner) (borrowsMut movedOut)
 
@@ -270,7 +292,7 @@ internalShouldMove variable = do
         return False
     else do
         unless (state == Free) $ throw (CannotMoveOut variable)
-        if not (isOnceFunction (variableType variable)) then do
+        if isOnceFunction (variableType variable) then do
             return False
         else do
             return True
@@ -305,18 +327,8 @@ borrowMutVariable borrowerId borrowedId = borrowInternal borrowerId borrowedId m
 
 borrowInternal :: VariableId -> VariableId -> (Variable -> PreprocessorMonad Variable) -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
 borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed = do
-    borrowerVariable <- getVariableById borrowerId
-    borrowedVariable <- getVariableById borrowedId
-    borrowerVariable' <- addBorrowed borrowerVariable
-    borrowedVariable' <- markAsBorrowed borrowedVariable
-    setVariableById borrowerId borrowerVariable'
-    setVariableById borrowedId borrowedVariable'
-
--- TODO: Dobrze by to było przetestować
--- Teoretycznie jeśli zrobi się
--- borrowVariable 1 2 (1 borrows 2)
--- moveOut 1
--- to 2 powinna być bez borrow
+    getVariableById borrowerId >>= addBorrowed >>= setVariableById borrowerId
+    getVariableById borrowedId >>= markAsBorrowed >>= setVariableById borrowedId
 
 -- first is subLifetime of second if and only if first lives longer or equal compared to second. (therefore second lifetime can be used in place of the first one)
 isSubLifetime :: Lifetime -> Lifetime -> Bool
@@ -350,3 +362,14 @@ saveLifetime :: Lifetime -> PreprocessorMonad ()
 saveLifetime lifetime = do
     LifetimeState _ id <- gets lifetimeState
     putLifetimeState $ LifetimeState lifetime id
+
+
+printVariables :: PreprocessorMonad ()
+printVariables = do
+    Variables _ variables <- gets variables
+    addWarning $ Debug ("Variables: [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]")
+
+printUsedVariables :: String -> PreprocessorMonad ()
+printUsedVariables text = do 
+    used <- gets usedVariables
+    addWarning $ Debug (text ++ show used)

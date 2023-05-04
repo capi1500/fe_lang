@@ -27,7 +27,7 @@ data PreprocessorState = PreprocessorState {
     variables :: Variables, -- follows code scopes, resets on function frames
     lifetimeState :: LifetimeState, -- current lifetime
     warnings :: [PreprocessorWarning], -- only grows
-    usedVariables :: [VariableId]
+    usedVariables :: Maybe VariableId
 } deriving (Eq, Ord, Show, Read)
 
 type PreprocessorMonad a = StateT PreprocessorState (Except (PreprocessorError, PreprocessorState)) a
@@ -45,7 +45,7 @@ makePreprocessorState = PreprocessorState {
     variables = Variables (Global empty) [],
     lifetimeState = LifetimeState staticLifetime 1,
     warnings = [],
-    usedVariables = []
+    usedVariables = Nothing
 }
 
 staticLifetime = Lifetime [0] 1
@@ -73,7 +73,7 @@ putWarnings warnings = do
 clearUsedVariables :: PreprocessorMonad ()
 clearUsedVariables = do
     PreprocessorState typeDefinitions variables currentLifetime warnings _ <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings []
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings Nothing
 
 addWarning :: PreprocessorWarning -> PreprocessorMonad ()
 addWarning warning = do

@@ -2,6 +2,8 @@ module Common.Types where
 
 import Fe.Abs (Ident, BNFC'Position)
 import Common.Utils
+import Common.Printer
+import Data.List (intercalate)
 
 data Type =
     TUntyped |
@@ -113,3 +115,21 @@ data FunctionKind =
 
 data Mutable = Mutable | Const
   deriving (Eq, Ord, Show, Read)
+
+
+instance CodePrint Type where
+    codePrint tabs TUntyped = "Untyped"
+    codePrint tabs (TPrimitive p) = show p
+    codePrint tabs (TStruct (Identifier _ ident) _) = "struct " ++ codePrint tabs ident
+    codePrint tabs (TVariant (Identifier _ ident) _) = "variant " ++ codePrint tabs ident
+    codePrint tabs (TFunction name kind params ret) = show kind ++ codePrint tabs name ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
+    codePrint tabs (TArray t) = "[" ++ codePrint tabs t ++ "]"
+    codePrint tabs (TReference Const t) = "&" ++ codePrint tabs t
+    codePrint tabs (TReference Mutable t) = "&mut " ++ codePrint tabs t
+
+instance CodePrint FunctionParam where
+    codePrint tabs (FunctionParam _ t) = codePrint tabs t
+
+instance CodePrint FunctionName where
+    codePrint tabs (NamedFunction (Identifier _ ident)) = " " ++ codePrint tabs ident
+    codePrint tabs Unnamed = ""

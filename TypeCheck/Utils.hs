@@ -17,6 +17,8 @@ import Fe.Abs (Ident)
 import TypeCheck.State hiding (Static)
 import TypeCheck.Error
 import TypeCheck.Variable
+import Data.List (intercalate)
+import Common.Printer
 import TypeCheck.StateFunctions
 
 assertType :: Type -> Type -> A.BNFC'Position -> PreprocessorMonad ()
@@ -57,24 +59,24 @@ castLifetime (A.ImplicitLifetime _) = do
     LifetimeState lifetime _ <- gets lifetimeState
     return lifetime
 
-getShortestLifetimeOfUsedVariables :: A.BNFC'Position -> PreprocessorMonad Lifetime
-getShortestLifetimeOfUsedVariables p = do
-    usedVariables <- gets usedVariables
-    when (null usedVariables) $ throw (CannotMakeEmptyReference p)
-    zipped <- traverse (\id -> do
-        variable <- getVariableById id
-        let Identifier position _ = variableIdentifier variable
-        return (lifetime variable, position)) usedVariables
-    let head:tail = zipped
-    (l, p) <- foldM helper head tail
-    return l
-  where
-    helper (l1, p1) (l2, p2) = do
-        l <- getShorterOfLifetimesOrThrow p1 p2 l1 l2
-        return $ if l == l1 then
-                (l1, p1)
-            else
-                (l2, p2)
+-- getShortestLifetimeOfUsedVariables :: A.BNFC'Position -> PreprocessorMonad Lifetime
+-- getShortestLifetimeOfUsedVariables p = do
+--     usedVariables <- gets usedVariables
+--     when (null usedVariables) $ throw (CannotMakeEmptyReference p)
+--     zipped <- traverse (\id -> do
+--         variable <- getVariableById id
+--         let Identifier position _ = variableIdentifier variable
+--         return (lifetime variable, position)) usedVariables
+--     let head:tail = zipped
+--     (l, p) <- foldM helper head tail
+--     return l
+--   where
+--     helper (l1, p1) (l2, p2) = do
+--         l <- getShorterOfLifetimesOrThrow p1 p2 l1 l2
+--         return $ if l == l1 then
+--                 (l1, p1)
+--             else
+--                 (l2, p2)
 
 
 getShorterOfLifetimesOrThrow :: A.BNFC'Position -> A.BNFC'Position -> Lifetime -> Lifetime -> PreprocessorMonad Lifetime
