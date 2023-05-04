@@ -43,7 +43,7 @@ instance CodePrint Variable where
   codePrint tabs (Variable (Identifier p value) const t state borrows borrowsMut lifetime) =
     let Lifetime list _ = lifetime in
     printTabs tabs ++ "{\n" ++
-    printTabs (tabs + 1) ++ show value ++ ": " ++ codePrint tabs t ++ "\n" ++
+    printTabs (tabs + 1) ++ show value ++ ": " ++ (if const then "const " else "") ++ codePrint tabs t ++ "\n" ++
     printTabs (tabs + 1) ++ show state ++ "\n" ++
     printTabs (tabs + 1) ++ "borrows: " ++ codePrint tabs borrows ++ "\n" ++
     printTabs (tabs + 1) ++ "borrowsMut: " ++ codePrint tabs borrowsMut ++ "\n" ++
@@ -66,3 +66,9 @@ setVariableBorrowsMut borrowsMut (Variable variableIdentifier variableType const
 changeVariable :: VariableState -> [VariableId] -> [VariableId] -> Variable -> Variable
 changeVariable variableState borrows borrowsMut (Variable variableIdentifier variableType const _ _ _ lifetime) =
     Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime
+
+borrowsMultiple :: Variable -> Bool
+borrowsMultiple var = length (borrows var) + length (borrowsMut var) > 1
+
+isDerefed :: Variable -> Bool
+isDerefed v = null (borrows v) && not (null (borrowsMut v)) && not (isReference (variableType v))

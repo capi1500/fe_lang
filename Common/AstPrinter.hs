@@ -10,16 +10,16 @@ instance CodePrint Code where
 instance CodePrint Statement where
     codePrint tabs EmptyStatement = ";\n"
     codePrint tabs (TypeStatement t) = printTabs tabs ++ show t
-    codePrint tabs (NewVariableStatement id _ (VarInitialized expr)) = "let " ++ codePrint tabs id ++ " = " ++ codePrint tabs expr ++ ";\n"
-    codePrint tabs (NewVariableStatement id _ VarUninitialized) = "let " ++ codePrint tabs id ++ ";\n"
-    codePrint tabs (NewFunctionStatement id expr params) = "fn " ++ codePrint tabs id ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ") " ++ codePrint tabs expr ++ "\n"
-    codePrint tabs (ExpressionStatement expr) = codePrint tabs expr ++ "\n"
+    codePrint tabs (NewVariableStatement id _ (VarInitialized expr)) = printTabs tabs ++ "let " ++ codePrint tabs id ++ " = " ++ codePrint tabs expr ++ ";\n"
+    codePrint tabs (NewVariableStatement id _ VarUninitialized) = printTabs tabs ++ "let " ++ codePrint tabs id ++ ";\n"
+    codePrint tabs (NewFunctionStatement id expr params) = printTabs tabs ++ "fn " ++ codePrint tabs id ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ") " ++ codePrint tabs expr ++ "\n"
+    codePrint tabs (ExpressionStatement expr) = printTabs tabs ++ codePrint tabs expr
 
 instance CodePrint TypedExpression where
     codePrint tabs (TypedExpression expr _ _ _) = codePrint tabs expr
 
 instance CodePrint Expression where
-    codePrint tabs (BlockExpression statements) = "{\n" ++ printTabs (tabs + 1) ++ intercalate (printTabs (tabs + 1)) (fmap (codePrint (tabs + 1)) statements) ++ printTabs tabs ++ "}"
+    codePrint tabs (BlockExpression statements) = "{\n" ++ intercalate "" (fmap (codePrint (tabs + 1)) statements) ++ printTabs tabs ++ "\n}"
     codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (\(_, _, e) -> codePrint tabs e) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
@@ -35,7 +35,7 @@ instance CodePrint Expression where
             show (fmap (\(VChar c) -> c) values)
         else
             "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
-
+    codePrint tabs (AssignmentExpression _ e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
     codePrint tabs expr = show expr
 
 instance CodePrint Value where

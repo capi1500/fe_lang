@@ -100,9 +100,9 @@ addVariable identifier isConst t variableState = do
     internalAddVariable identifier isConst t variableState id
 
 -- does not change lifetimes, takes it from the environment
-addTemporaryVariable :: BNFC'Position -> Type -> PreprocessorMonad VariableId
-addTemporaryVariable p t = do
-    internalAddVariable (Identifier p (Ident "temporary")) True t Free Nothing
+addTemporaryVariable :: BNFC'Position -> Bool -> Type -> PreprocessorMonad VariableId
+addTemporaryVariable p isConst t = do
+    internalAddVariable (Identifier p (Ident "temporary")) isConst t Free Nothing
 
 internalAddVariable :: Identifier -> Bool -> Type -> VariableState -> Maybe VariableId -> PreprocessorMonad VariableId
 internalAddVariable identifier isConst t variableState id = do
@@ -173,7 +173,7 @@ reproduceWithPersistent p state = do
     usedVariables <- gets usedVariables
     maybeVar <- if isJust usedVariables then do
             let usedId = fromJust usedVariables
-            var <- getVariableById usedId 
+            var <- getVariableById usedId
             return $ Just var
         else do
             return Nothing
@@ -189,7 +189,7 @@ reproduceWithPersistent p state = do
 
     when (isJust maybeVar) $ do
         let template = fromJust maybeVar
-        tempVar <- addTemporaryVariable p (variableType template)
+        tempVar <- addTemporaryVariable p (variableIsConst template) (variableType template)
         traverse_ (borrowVariable p tempVar) (borrows template)
         traverse_ (borrowMutVariable p tempVar) (borrowsMut template)
         markVariableUsed tempVar
@@ -230,7 +230,7 @@ moveOutVariable id = do
     variable <- getVariableById id
 
     shouldMove <- internalShouldMove variable
-    if not shouldMove then do return ()
+    if not (isDerefed variable) && not shouldMove then do return ()
     else do
 
     addWarning $ Debug ("Moving out " ++ show id ++ " " ++ show (variableIdentifier variable))
@@ -260,7 +260,9 @@ transferOwnership newOwnerId movedOutId = do
     movedOut <- getVariableById movedOutId
 
     shouldMove <- internalShouldMove movedOut
-    if not shouldMove then do return ()
+    if isDerefed movedOut then do 
+        moveOutVariable movedOutId
+    else if not shouldMove then do return ()
     else do
 
     addWarning $ Debug ("Transfering " ++ show movedOutId ++ " to " ++ show newOwnerId)
@@ -294,10 +296,8 @@ internalShouldMove variable = do
         return False
     else do
         unless (state == Free) $ throw (CannotMoveOut variable)
-        if isOnceFunction (variableType variable) then do
-            return False
-        else do
-            return True
+        let t = variableType variable
+        return $ not (isOnceFunction t || isPrimitive t)
 
 borrowVariable :: A.BNFC'Position -> VariableId -> VariableId -> PreprocessorMonad ()
 borrowVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
@@ -369,9 +369,14 @@ saveLifetime lifetime = do
 printVariables :: PreprocessorMonad ()
 printVariables = do
     Variables _ variables <- gets variables
-    addWarning $ Debug ("Variables: [\n" ++ intercalate ",\n" (fmap (codePrint 2) variables) ++ "]")
+    addWarning $ Debug ("Variables: [\n" ++
+        intercalate ",\n"
+            (fmap
+                (\(v, i) -> show i ++ ": " ++ codePrint 2 v)
+                (zip variables [0 .. (length variables)]))
+        ++ "]")
 
 printUsedVariables :: String -> PreprocessorMonad ()
-printUsedVariables text = do 
+printUsedVariables text = do
     used <- gets usedVariables
     addWarning $ Debug (text ++ show used)

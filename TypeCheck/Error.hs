@@ -27,6 +27,8 @@ data PreprocessorError =
     CannotMoveOut Variable |
     LifetimesMismatch BNFC'Position BNFC'Position  Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |
+    CannotTakeMutableReferenceToConstant BNFC'Position Type |
+    CannotDerefNotReference BNFC'Position Type |
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |
     Fatal String

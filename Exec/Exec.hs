@@ -45,6 +45,7 @@ instance Executable Statement Value where
     execute (NewVariableStatement ident isRef initialization) = do
         value <- execute initialization >>= derefVariable isRef
         addVariable ident value
+        printLocalScope
         return VUnit
     execute (NewFunctionStatement ident expression paramIdents) = do
         let value = Variable $ VFunction [] expression
@@ -101,9 +102,10 @@ instance Executable Expression Value where
         v2 <- execute e2 >>= deref
         doBooleanDoubleOperator operator v1 v2
     execute (AssignmentExpression isRef e1 e2) = do
-        VReference v1 <- execute e1
-        v2 <- derefConditionally isRef (execute e2)
+        VReference v1 <- derefConditionally isRef (execute e1)
+        v2 <- execute e2
         setVariableById v1 v2
+        printLocalScope
         return $ VReference v1
     execute _ = do
         throwError $ Other "Not yet implemented"

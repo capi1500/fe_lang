@@ -136,11 +136,11 @@ instance TypeCheck A.Item Statement where
         let variableState =
                 if isUnInitialized initialization then Uninitialized
                 else Free
-
+        
         id <- addVariable identifier (isConst cv) t variableState
         handleUsedVariables (transferOwnership id)
         printVariables
-        return $ NewVariableStatement ident (isReference t) initialization'
+        return $ NewVariableStatement ident (not (isReference t)) initialization'
 
 instance TypeCheck A.FunctionParam FunctionParam where
     typeCheck :: A.FunctionParam -> PreprocessorMonad FunctionParam
@@ -216,20 +216,32 @@ instance TypeCheck A.Expression TypedExpression where
         return $ TypedExpression (UnaryNegationExpression e') boolType staticLifetime False
     typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
         TypedExpression e' t l _ <- typeCheck e
-        throw $ Other "Not yet implemented" p
+        unless (isReference t) $ throw (CannotDerefNotReference p t)
+        let TReference mutable innerT = t
+        tempVariableId <- addTemporaryVariable p (isConstReference t) innerT
+        handleUsedVariables (transferOwnership tempVariableId)
+        markVariableUsed tempVariableId
+        var <- getVariableById tempVariableId
+        printUsedVariables "Deref: "
+        printVariables
+        return $ TypedExpression e' innerT l (not (borrowsMultiple var))
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         TypedExpression e' t l _ <- typeCheck e
         let t' = TReference Const t
-        referenceTempVariableId <- addTemporaryVariable p t'
+        referenceTempVariableId <- addTemporaryVariable p True t'
         handleUsedVariables (borrowVariable p referenceTempVariableId)
         markVariableUsed referenceTempVariableId
+        printUsedVariables "Ref: "
+        printVariables
         return $ TypedExpression e' t' l False
     typeCheck (A.UnaryExpression _ (A.ReferenceMut p) e) = do
         TypedExpression e' t l _ <- typeCheck e
         let t' = TReference Mutable t
-        referenceTempVariableId <- addTemporaryVariable p t'
+        referenceTempVariableId <- addTemporaryVariable p False t'
         handleUsedVariables (borrowMutVariable p referenceTempVariableId)
         markVariableUsed referenceTempVariableId
+        printUsedVariables "Ref mut: "
+        printVariables
         return $ TypedExpression e' t' l False
     typeCheck (A.LiteralExpression _ literal) = do
         typeCheck literal
@@ -328,18 +340,20 @@ makeAssignmentOperatorExpression (A.Assign p) e1 e2 = do
 
     when (variableIsConst var) $ throw (AssignmentToConstant p assignedVariable)
     unless (state /= Free || state /= Uninitialized) $ throw (AlreadyBorrowed assignedVariable (hasPosition e1))
+    printUsedVariables "Assignment left: "
+    printVariables
     clearUsedVariables
     when (state == Free) $ moveOutVariable assignedVariable
     
     TypedExpression e2' t2 l2 _ <- typeCheck e2
     assertType t1 t2 p
 
-    printUsedVariables "Assignment: "
+    printUsedVariables "Assignment Right: "
     handleUsedVariables (transferOwnership assignedVariable)
     mutateVariableById assignedVariable (setVariableState Free)
     printVariables
 
-    return $ TypedExpression (AssignmentExpression False e1' e2') t1 staticLifetime False
+    return $ TypedExpression (AssignmentExpression (isDerefed var) e1' e2') t1 staticLifetime False
 
 makeAssignmentOperatorExpression' :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
 makeAssignmentOperatorExpression' op e1 e2 = do
@@ -380,7 +394,7 @@ ifExpression p condition onTrue onFalse = do
         return onTrueType
 
     when (isJust onTrueUsed || isJust onFalseUsed) $ do
-        mergedTmpVariable <- addTemporaryVariable p t
+        mergedTmpVariable <- addTemporaryVariable p False t
         when (isJust onTrueUsed) $ do transferOwnership mergedTmpVariable (fromJust onTrueUsed)
         when (isJust onFalseUsed) $ do transferOwnership mergedTmpVariable (fromJust onFalseUsed)
         markVariableUsed mergedTmpVariable
@@ -391,24 +405,14 @@ ifExpression p condition onTrue onFalse = do
 instance TypeCheck A.Literal TypedExpression where
     typeCheck :: A.Literal -> PreprocessorMonad TypedExpression
     typeCheck (A.LiteralChar p char) = do
-        -- id <- addTemporaryVariable p charType
-        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VChar char) charType staticLifetime False
     typeCheck (A.LiteralString p string) = do
-        -- id <- addTemporaryVariable p stringType
-        -- markVariableUsed id
         return $ TypedExpression (MakeArrayExpression (fmap VChar string)) stringType staticLifetime False
     typeCheck (A.LiteralInteger p integer) = do
-        -- id <- addTemporaryVariable p i32Type
-        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VI32 (fromIntegral integer)) i32Type staticLifetime False
     typeCheck (A.LiteralBoolean p (A.BoolTrue _)) = do
-        -- id <- addTemporaryVariable p boolType
-        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VBool True) boolType staticLifetime False
     typeCheck (A.LiteralBoolean p (A.BoolFalse _)) = do
-        -- id <- addTemporaryVariable p boolType
-        -- markVariableUsed id
         return $ TypedExpression (LiteralExpression $ VBool False) boolType staticLifetime False
 
 instance TypeCheck A.CallParam TypedExpression where

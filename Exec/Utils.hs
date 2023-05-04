@@ -18,9 +18,9 @@ valueOfBlock statements =
 derefConditionally :: Bool -> ExecutorMonad Value -> ExecutorMonad Value
 derefConditionally isRef exec = do
     exec >>= if isRef then do
-            return
-        else do
             deref
+        else do
+            return
 
 deref :: Value -> ExecutorMonad Value
 deref (VReference pointer) = do
