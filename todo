@@ -6,7 +6,7 @@
 
 - Dodać explicit lifetime annotations
 	są tak w ogóle 2 różne lifetime-y
-	1. annotated - które mają pozwolić type checkerowi się ogarnąć
+	1. annotated - które mają pozwolić type checkerowi się ogarnąć
 	2. "normal" - prawdziwe, typecheckowane, lifetime-y
 	Wartości mają prawdziwe lifetime
 	Typy mają annotated lifetime
