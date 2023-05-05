@@ -28,7 +28,7 @@ newtype Code = Code [Statement]
 data Statement =
     EmptyStatement |
     TypeStatement Type |
-    NewVariableStatement Ident Bool Initialization | -- ident, is_reference, init
+    NewVariableStatement Ident Initialization | -- ident, is_reference, init
     NewFunctionStatement Ident Expression [Ident] |
     ExpressionStatement TypedExpression
   deriving (Eq, Ord, Show, Read)
@@ -36,7 +36,7 @@ data Statement =
 data Initialization = VarInitialized Expression | VarUninitialized
   deriving (Eq, Ord, Show, Read)
 
-data TypedExpression = TypedExpression Expression Type Lifetime Bool -- expression, type of expression, lifetime of value that the expression holds, isPlaceExpression
+data TypedExpression = TypedExpression Expression Type Lifetime -- expression, type of expression, lifetime of value that the expression holds
   deriving (Eq, Ord, Show, Read)
 
 data Expression =
@@ -48,12 +48,13 @@ data Expression =
     LiteralExpression Value |
     MakeArrayExpression [Value] |
     VariableExpression Ident | -- variableId is valid for current frame
+    ReferenceExpression Ident |
     -- StructExpression Ident [StructExpressionField]
     -- ArrayExpressionItems [ArrayElement]
     -- ArrayExpressionDefault Expression Expression |
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
-    CallExpression Expression [(Ident, Bool, Expression)] | -- ident, is_reference, expression
+    CallExpression Expression [(Ident, Expression)] | -- ident, is_reference, expression
     -- IndexExpression Expression Expression |
     -- UnaryExpression UnaryOperator Expression |
     UnaryMinusExpression Expression |

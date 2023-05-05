@@ -16,7 +16,8 @@ data PreprocessorError =
     TypeNotDefined Identifier |
     TypeMismatch BNFC'Position Type Type | -- ident, ident actual type, ident expected type
     ExpressionNotCallable BNFC'Position Type |
-    NotPlaceExpression BNFC'Position |
+    IllegalInLValue BNFC'Position |
+    IllegalInRValue BNFC'Position |
     VariableNotDefined Identifier |
     ConstantNotInitialized Identifier |
     VariableAtGlobalScope Identifier |
@@ -27,7 +28,7 @@ data PreprocessorError =
     CannotMoveOut Variable |
     LifetimesMismatch BNFC'Position BNFC'Position  Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |
-    CannotTakeMutableReferenceToConstant BNFC'Position Type |
+    CannotTakeMutableReferenceToConstant BNFC'Position VariableId |
     CannotDerefNotReference BNFC'Position Type |
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |

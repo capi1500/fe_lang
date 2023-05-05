@@ -15,12 +15,12 @@ valueOfBlock statements =
     else
         last statements
 
-derefConditionally :: Bool -> ExecutorMonad Value -> ExecutorMonad Value
-derefConditionally isRef exec = do
-    exec >>= if isRef then do
-            deref
-        else do
-            return
+-- derefConditionally :: Bool -> ExecutorMonad Value -> ExecutorMonad Value
+-- derefConditionally shouldBeReference exec = do
+--     exec >>= if shouldBeReference then do
+--             return
+--         else do
+--             deref
 
 deref :: Value -> ExecutorMonad Value
 deref (VReference pointer) = do
@@ -29,15 +29,15 @@ deref (VReference pointer) = do
 deref x = do
     return x
 
-derefVariable :: Bool -> Variable -> ExecutorMonad Variable
-derefVariable isRef Uninitialized = do
-    return Uninitialized
-derefVariable isRef (Variable value) = do
-    v' <- if isRef then do
-        deref value
-    else do
-        return value
-    return $ Variable v'
+-- derefVariable :: Bool -> Variable -> ExecutorMonad Variable
+-- derefVariable shouldBeReference Uninitialized = do
+--     return Uninitialized
+-- derefVariable shouldBeReference (Variable value) = do
+--     v' <- if shouldBeReference then do
+--         return value
+--     else do
+--         deref value
+--     return $ Variable v'
 
 printLocalScope :: ExecutorMonad ()
 printLocalScope = do

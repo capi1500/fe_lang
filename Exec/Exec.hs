@@ -42,8 +42,8 @@ instance Executable Statement Value where
         return VUnit
     execute (TypeStatement t) = do
         throwError $ Other "Not yet implemented"
-    execute (NewVariableStatement ident isRef initialization) = do
-        value <- execute initialization >>= derefVariable isRef
+    execute (NewVariableStatement ident initialization) = do
+        value <- execute initialization
         addVariable ident value
         printLocalScope
         return VUnit
@@ -51,7 +51,7 @@ instance Executable Statement Value where
         let value = Variable $ VFunction [] expression
         addVariable ident value
         return VUnit
-    execute (ExpressionStatement (TypedExpression expression _ _ _)) = do
+    execute (ExpressionStatement (TypedExpression expression _ _)) = do
         execute expression
 
 instance Executable Initialization Variable where
@@ -79,14 +79,17 @@ instance Executable Expression Value where
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
         return $ VArray (length values) pointers
     execute (VariableExpression ident) = do
+        (_, Variable value) <- getVariable ident
+        return value
+    execute (ReferenceExpression ident) = do
         (pointer, _) <- getVariable ident
         return $ VReference pointer
     execute (LiteralExpression value) = do
         return value
     execute (CallExpression function_object params) = do
         VFunction _ code <- execute function_object >>= deref
-        params' <- traverse (\(i, isRef, e) -> do
-            x <- derefConditionally isRef (execute e)
+        params' <- traverse (\(i, e) -> do
+            x <- execute e
             return (i, x)) params
         inNewScope $ do
             traverse_ (\(paramIdent, paramValue) -> do
@@ -94,16 +97,16 @@ instance Executable Expression Value where
                 params'
             execute code
     execute (I32DoubleOperatorExpression operator e1 e2) = do
-        v1 <- execute e1 >>= deref
-        v2 <- execute e2 >>= deref
+        v1 <- execute e1
+        v2 <- execute e2
         doNumericDoubleOperator operator v1 v2
     execute (BoolDoubleOperatorExpression operator e1 e2) = do
-        v1 <- execute e1 >>= deref
-        v2 <- execute e2 >>= deref
+        v1 <- execute e1
+        v2 <- execute e2
         doBooleanDoubleOperator operator v1 v2
     execute (AssignmentExpression isRef e1 e2) = do
         VReference v1 <- execute e1
-        v2 <- derefConditionally isRef (execute e2)
+        v2 <- execute e2
         setVariableById v1 v2
         printLocalScope
         return $ VReference v1

@@ -26,13 +26,13 @@ assertType actualType expectedType p = do
     when (expectedType /= actualType) $
         throw $ TypeMismatch p actualType expectedType
 
-isVariable :: A.CV -> Bool
-isVariable (A.Const _) = False
-isVariable (A.Var _) = True
+isVariableCV :: A.CV -> Bool
+isVariableCV (A.Const _) = False
+isVariableCV (A.Var _) = True
 
-isConst :: A.CV -> Bool
-isConst (A.Const _) = True
-isConst (A.Var _) = False
+isConstCV :: A.CV -> Bool
+isConstCV (A.Const _) = True
+isConstCV (A.Var _) = False
 
 isUnInitialized :: A.Initialization -> Bool
 isUnInitialized (A.Initialized _ _) = False
@@ -101,3 +101,23 @@ nameOfItem (A.ItemFunction _ (A.Ident ident) _ _ _ _) = ident
 nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariant _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
+
+-- tries to dereference a variable, which is currently marked as used
+-- it can be only done after expression parsed in LValue context
+-- Assumes:
+--  - used variable is a 
+--      - temporary referenece
+--      - it mutably borrows a non-temporary variable
+deref :: PreprocessorMonad (VariableId, Variable)
+deref = do
+    maybeUsed <- gets usedVariables
+    let variableRefId = fromJust maybeUsed
+    variableRef <- getVariableById variableRefId
+    handleUsedVariables moveOutVariable
+
+    let TReference _ t = variableType variableRef
+    unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (Fatal "LValue references more than 1 mutable reference")
+
+    let variableId = head (borrowsMut variableRef)
+    variable <- getVariableById variableId
+    return (variableId, variable)

@@ -75,6 +75,17 @@ fn l() {
 	println!("{}", z);
 }
 
+fn m() {
+	let mut x: &mut i32;
+	let mut z = 3;
+	{
+		let mut y = 5;
+		x = &mut y;
+		println!("{}", x);
+	}
+	println!("{}", x);
+}
+
 fn main() {
-	l();
+	m();
 }

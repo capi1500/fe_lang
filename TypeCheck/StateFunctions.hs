@@ -94,23 +94,23 @@ getLocalVariable (Identifier _ ident) = do
         return (id, listGet id variables)
 
 -- does not change lifetimes, takes it from the environment
-addVariable :: Identifier -> Bool -> Type -> VariableState -> PreprocessorMonad VariableId
-addVariable identifier isConst t variableState = do
+addVariable :: Identifier -> Mutable -> Type -> VariableState -> PreprocessorMonad VariableId
+addVariable identifier mut t variableState = do
     id <- checkShadowing identifier
-    internalAddVariable identifier isConst t variableState id
+    internalAddVariable identifier mut t variableState id
 
 -- does not change lifetimes, takes it from the environment
-addTemporaryVariable :: BNFC'Position -> Bool -> Type -> PreprocessorMonad VariableId
-addTemporaryVariable p isConst t = do
-    internalAddVariable (Identifier p (Ident "temporary")) isConst t Free Nothing
+addTemporaryVariable :: BNFC'Position -> Mutable -> Type -> PreprocessorMonad VariableId
+addTemporaryVariable p mut t = do
+    internalAddVariable (Identifier p (Ident "temporary")) mut t Free Nothing
 
-internalAddVariable :: Identifier -> Bool -> Type -> VariableState -> Maybe VariableId -> PreprocessorMonad VariableId
-internalAddVariable identifier isConst t variableState id = do
+internalAddVariable :: Identifier -> Mutable -> Type -> VariableState -> Maybe VariableId -> PreprocessorMonad VariableId
+internalAddVariable identifier mut t variableState id = do
     variables <- gets variables
     lifetime <- getLifetime
     let variable = Variable {
         variableIdentifier = identifier,
-        variableIsConst = isConst,
+        variableMutability = mut,
         variableType = t,
         variableState = variableState,
         borrows = [],
@@ -189,7 +189,7 @@ reproduceWithPersistent p state = do
 
     when (isJust maybeVar) $ do
         let template = fromJust maybeVar
-        tempVar <- addTemporaryVariable p (variableIsConst template) (variableType template)
+        tempVar <- addTemporaryVariable p (variableMutability template) (variableType template)
         traverse_ (borrowVariable p tempVar) (borrows template)
         traverse_ (borrowMutVariable p tempVar) (borrowsMut template)
         markVariableUsed tempVar
@@ -213,11 +213,11 @@ checkShadowing identifier = do
 
 markVariableUsed :: VariableId -> PreprocessorMonad ()
 markVariableUsed id = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables <- get
+    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context <- get
     when (isJust usedVariables) $ do
         printVariables
         throw (Fatal ("Marking variable " ++ show id ++ " as used, when another variable is used " ++ show (fromJust usedVariables)))
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings (Just id)
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings (Just id) context
 
 handleUsedVariables :: (VariableId -> PreprocessorMonad ()) -> PreprocessorMonad ()
 handleUsedVariables handler = do
@@ -303,12 +303,14 @@ borrowVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId ma
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
     markAsBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
         state' <- if state == Free then do
-                return $ Borrowed (singleton borrowerId)
+            return $ Borrowed (singleton borrowerId)
+        else if state == Uninitialized then do
+            throw $ UninitializedVariableUsed p ident
         else if isBorrowed state then do
-                let Borrowed whatBorrows = state
-                return $ Borrowed (Data.Set.insert borrowerId whatBorrows)
+            let Borrowed whatBorrows = state
+            return $ Borrowed (Data.Set.insert borrowerId whatBorrows)
         else do
-            throw (AlreadyBorrowed borrowerId p)
+            throw $ AlreadyBorrowed borrowerId p
         return $ Variable ident const t state' borrows borrowsMut lifetime
     addBorrowed :: Variable -> PreprocessorMonad Variable
     addBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
@@ -318,9 +320,10 @@ borrowMutVariable :: A.BNFC'Position -> VariableId -> VariableId -> Preprocessor
 borrowMutVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
   where
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
-    markAsBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
-        unless (state == Free) $ throw (AlreadyBorrowed borrowerId p)
-        return $ Variable ident const t (BorrowedMut borrowerId) borrows borrowsMut lifetime
+    markAsBorrowed (Variable ident mutability t state borrows borrowsMut lifetime) = do
+        unless (state == Free || state == Uninitialized) $ throw (AlreadyBorrowed borrowedId p)
+        when (isConst mutability) $ throw (CannotTakeMutableReferenceToConstant p borrowedId)
+        return $ Variable ident mutability t (BorrowedMut borrowerId) borrows borrowsMut lifetime
     addBorrowed :: Variable -> PreprocessorMonad Variable
     addBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
         return $ Variable ident const t state borrows (listPushBack borrowedId borrowsMut) lifetime
@@ -363,6 +366,32 @@ saveLifetime lifetime = do
     LifetimeState _ id <- gets lifetimeState
     putLifetimeState $ LifetimeState lifetime id
 
+whenContext :: PreprocessorMonad a -> PreprocessorMonad a -> PreprocessorMonad a
+whenContext onLValue onRValue = do
+    context <- gets context
+    let isLValue = case context of
+            LValue -> True
+            _ -> False
+    if isLValue then do onLValue
+    else do onRValue
+
+whenLValue :: PreprocessorMonad () -> PreprocessorMonad ()
+whenLValue f = do
+    context <- gets context
+    let isLValue = case context of
+            LValue -> True
+            _ -> False
+    if isLValue then do f
+    else do return ()
+
+whenRValue :: PreprocessorMonad () -> PreprocessorMonad ()
+whenRValue f = do
+    context <- gets context
+    let isRValue = case context of
+            RValue -> True
+            _ -> False
+    if isRValue then do f
+    else do return ()
 
 printVariables :: PreprocessorMonad ()
 printVariables = do

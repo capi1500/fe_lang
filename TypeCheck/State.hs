@@ -22,12 +22,16 @@ data Variables = Variables VariableMappings [Variable]
 data LifetimeState = LifetimeState Lifetime Int
     deriving (Eq, Ord, Show, Read)
 
+data Context = None | LValue | RValue
+    deriving (Eq, Ord, Show, Read)
+
 data PreprocessorState = PreprocessorState {
     typeDefinitions :: TypeDefinitions, -- follows code scopes
     variables :: Variables, -- follows code scopes, resets on function frames
     lifetimeState :: LifetimeState, -- current lifetime
     warnings :: [PreprocessorWarning], -- only grows
-    usedVariables :: Maybe VariableId
+    usedVariables :: Maybe VariableId,
+    context :: Context
 } deriving (Eq, Ord, Show, Read)
 
 type PreprocessorMonad a = StateT PreprocessorState (Except (PreprocessorError, PreprocessorState)) a
@@ -45,40 +49,46 @@ makePreprocessorState = PreprocessorState {
     variables = Variables (Global empty) [],
     lifetimeState = LifetimeState staticLifetime 1,
     warnings = [],
-    usedVariables = Nothing
+    usedVariables = Nothing,
+    context = None
 }
 
 staticLifetime = Lifetime [0] 1
 
 putTypeDefinitions :: TypeDefinitions -> PreprocessorMonad ()
 putTypeDefinitions typeDefinitions = do
-    PreprocessorState _ variables currentLifetime warnings usedVariables <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables
+    PreprocessorState _ variables currentLifetime warnings usedVariables context <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
 
 putVariables :: Variables -> PreprocessorMonad ()
 putVariables variables = do
-    PreprocessorState typeDefinitions _ currentLifetime warnings usedVariables <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables
+    PreprocessorState typeDefinitions _ currentLifetime warnings usedVariables context <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
 
 putLifetimeState :: LifetimeState -> PreprocessorMonad ()
 putLifetimeState lifetimeState = do
-    PreprocessorState typeDefinitions variables _ warnings usedVariables <- get
-    put $ PreprocessorState typeDefinitions variables lifetimeState warnings usedVariables
+    PreprocessorState typeDefinitions variables _ warnings usedVariables context <- get
+    put $ PreprocessorState typeDefinitions variables lifetimeState warnings usedVariables context
 
 putWarnings :: [PreprocessorWarning] -> PreprocessorMonad ()
 putWarnings warnings = do
-    PreprocessorState typeDefinitions variables currentLifetime _ usedVariables <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables
+    PreprocessorState typeDefinitions variables currentLifetime _ usedVariables context <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
 
 clearUsedVariables :: PreprocessorMonad ()
 clearUsedVariables = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings _ <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings Nothing
+    PreprocessorState typeDefinitions variables currentLifetime warnings _ context <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings Nothing context
 
 addWarning :: PreprocessorWarning -> PreprocessorMonad ()
 addWarning warning = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime (warning:warnings) usedVariables
+    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime (warning:warnings) usedVariables context
+
+putContext :: Context -> PreprocessorMonad ()
+putContext context = do
+    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables _ <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
 
 instance CodePrint Variables where
   codePrint tabs (Variables _ list) = "[" ++ intercalate ("\n" ++ printTabs tabs) (fmap show list) ++ "]"

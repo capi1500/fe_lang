@@ -116,6 +116,13 @@ data FunctionKind =
 data Mutable = Mutable | Const
   deriving (Eq, Ord, Show, Read)
 
+isConst :: Mutable -> Bool
+isConst Const = True
+isConst Mutable = False
+
+isMutable :: Mutable -> Bool
+isMutable Const = False
+isMutable Mutable = True
 
 instance CodePrint Type where
     codePrint tabs TUntyped = "Untyped"
