@@ -237,7 +237,28 @@ instance TypeCheck A.Expression TypedExpression where
         assertType t boolType (hasPosition e)
         handleUsedVariables moveOutVariable
         return $ TypedExpression (UnaryNegationExpression e') boolType staticLifetime
-    -- typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
+    typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
+        context <- gets context
+        putContext RValue
+        TypedExpression e' t l <- typeCheck e
+        putContext context
+        whenContext
+            (do
+                maybeUsed <- gets usedVariables
+                let variableRefId = fromJust maybeUsed
+                variableRef <- getVariableById variableRefId
+                handleUsedVariables moveOutVariable
+
+                let TReference _ t = variableType variableRef
+                unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (Fatal "LValue references more than 1 mutable reference")
+
+                let variableId = head (borrowsMut variableRef)
+                variable <- getVariableById variableId
+                return ()
+            )
+            (do
+                return ()
+            )
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         whenLValue $ throw (IllegalInLValue p)
         putContext LValue
