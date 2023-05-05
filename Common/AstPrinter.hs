@@ -27,7 +27,8 @@ instance CodePrint Expression where
         maybe "" (\onFalse -> "\n" ++ printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
     codePrint tabs (LiteralExpression value) = codePrint tabs value
     codePrint tabs (VariableExpression ident) = codePrint tabs ident
-    codePrint tabs (ReferenceExpression ident) = codePrint tabs ident
+    codePrint tabs (ReferenceExpression ident) = "&" ++ codePrint tabs ident
+    codePrint tabs (DereferenceExpression e) = "*" ++ codePrint tabs e
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (I32DoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (UnaryMinusExpression e) = "-" ++ codePrint tabs e

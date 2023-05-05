@@ -1,0 +1,7 @@
+fn main() -> i32 {
+    var a = 1;
+    var b = &mut a; // has mutable reference to a
+    var c = &mut b; // 
+    var d = *c;
+    *d
+}

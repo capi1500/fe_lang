@@ -75,17 +75,57 @@ fn l() {
 	println!("{}", z);
 }
 
-fn m() {
-	let mut x: &mut i32;
-	let mut z = 3;
-	{
-		let mut y = 5;
-		x = &mut y;
-		println!("{}", x);
-	}
-	println!("{}", x);
+// fn m() {
+// 	let mut x: &mut i32;
+// 	let mut z = 3;
+// 	{
+// 		let mut y = 5;
+// 		x = &mut y;
+// 		println!("{}", x);
+// 	}
+// 	println!("{}", x);
+// }
+
+// fn n() {
+// 	let mut a = 1;
+// 	let mut b = &mut a;
+// 	let mut c = &mut b;
+// 	let mut d = *c; // *c == b, witch is moved out here
+// 	println!("{}", *d);
+// }
+
+/*
+error[E0507]: cannot move out of `*c` which is behind a mutable reference
+  --> test.rs:93:14
+   |
+93 |     let mut d = *c;
+   |                 ^^
+   |                 |
+   |                 move occurs because `*c` has type `&mut i32`, which does not implement the `Copy` trait
+   |                 help: consider borrowing here: `&*c`
+   */
+
+fn n() {
+	let mut a1 = 1;
+	let mut a2 = 2;
+	let mut b1 = &mut a1;
+	let mut b2 = &mut a2;
+	let mut c = if true {&mut b1} else {&mut b2};
+	let mut d = **c; // *c == b, witch is moved out here
+	println!("{}", d);
 }
 
+/*
+error[E0507]: cannot move out of `*c` which is behind a mutable reference
+  --> test.rs:93:14
+    |
+114 |     let mut d = *c;
+    |                 ^^
+    |                 |
+    |                 move occurs because `*c` has type `&mut i32`, which does not implement the `Copy` trait
+    |                 help: consider borrowing here: `&*c`
+   */
+
 fn main() {
-	m();
+	n();
 }

@@ -242,22 +242,38 @@ instance TypeCheck A.Expression TypedExpression where
         putContext RValue
         TypedExpression e' t l <- typeCheck e
         putContext context
+        unless (isReference t) $ throw (CannotDerefNotReference p t)
+        let TReference mutability innerT = t
         whenContext
             (do
                 maybeUsed <- gets usedVariables
-                let variableRefId = fromJust maybeUsed
+                let variableRefId = fromJust maybeUsed -- reference was returned, so there must be a usedVariable
                 variableRef <- getVariableById variableRefId
-                handleUsedVariables moveOutVariable
 
-                let TReference _ t = variableType variableRef
-                unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (Fatal "LValue references more than 1 mutable reference")
+                unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (CannotDerefReferenceToMultipleVariables p variableRefId)
 
-                let variableId = head (borrowsMut variableRef)
-                variable <- getVariableById variableId
-                return ()
+                -- Because it lvalue, returning a reference holding at most 1 mutable borrow
+                printUsedVariables "LValue deref: "
+                printVariables
+                return $ TypedExpression e' t l
             )
             (do
-                return ()
+                derefedVariableId <- addTemporaryVariable p mutability innerT
+                lifetime <- if isReference innerT then do
+                    handleUsedVariables (transferOwnership derefedVariableId)
+                    markVariableUsed derefedVariableId
+
+                    derefedVariable <- getVariableById derefedVariableId
+                    lifetime <- getShortestLifetime p (borrows derefedVariable ++ borrowsMut derefedVariable)
+                    mutateVariableById derefedVariableId (setVariableLifetime lifetime)
+                    return lifetime
+                else do
+                    handleUsedVariables moveOutVariable
+                    return staticLifetime
+                
+                printUsedVariables "RValue deref: "
+                printVariables
+                return $ TypedExpression (DereferenceExpression e') innerT lifetime
             )
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         whenLValue $ throw (IllegalInLValue p)

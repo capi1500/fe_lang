@@ -84,6 +84,8 @@ instance Executable Expression Value where
     execute (ReferenceExpression ident) = do
         (pointer, _) <- getVariable ident
         return $ VReference pointer
+    execute (DereferenceExpression e) = do
+        execute e >>= deref
     execute (LiteralExpression value) = do
         return value
     execute (CallExpression function_object params) = do

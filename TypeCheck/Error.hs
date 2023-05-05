@@ -29,7 +29,8 @@ data PreprocessorError =
     LifetimesMismatch BNFC'Position BNFC'Position  Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |
     CannotTakeMutableReferenceToConstant BNFC'Position VariableId |
-    CannotDerefNotSingularMutableReference VariableId |
+    CannotDerefNotReference BNFC'Position Type |
+    CannotDerefReferenceToMultipleVariables BNFC'Position VariableId |
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |
     Fatal String

@@ -66,3 +66,7 @@ setVariableBorrowsMut borrowsMut (Variable variableIdentifier variableType const
 changeVariable :: VariableState -> [VariableId] -> [VariableId] -> Variable -> Variable
 changeVariable variableState borrows borrowsMut (Variable variableIdentifier variableType const _ _ _ lifetime) =
     Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime
+  
+setVariableLifetime :: Lifetime -> Variable -> Variable
+setVariableLifetime lifetime (Variable variableIdentifier variableType const variableState borrows borrowsMut _) =
+    Variable variableIdentifier variableType const variableState borrows borrowsMut lifetime

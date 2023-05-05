@@ -1,3 +1,6 @@
+- zmienić na place/asignee/value expression
+
+
 - Jeśli zwrócona może być jedna z wielu wartości, zwrócony lifetime powinien być najkrótszy, a function kind z preferencją do FnOnce
 - While i for expression mogą być typecheckowane dwa razy, żeby ogarnąć, czy jakaś funkcja/inna zmienna nie jest moved w środku
 

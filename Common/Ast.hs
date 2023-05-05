@@ -49,6 +49,7 @@ data Expression =
     MakeArrayExpression [Value] |
     VariableExpression Ident | -- variableId is valid for current frame
     ReferenceExpression Ident |
+    DereferenceExpression Expression |
     -- StructExpression Ident [StructExpressionField]
     -- ArrayExpressionItems [ArrayElement]
     -- ArrayExpressionDefault Expression Expression |
