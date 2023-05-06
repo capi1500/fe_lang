@@ -42,7 +42,7 @@ deref x = do
 printLocalScope :: ExecutorMonad ()
 printLocalScope = do
     mappings <- gets variableMappings
-    vars <- traverse (\(Ident ident, id) -> do
+    vars <- traverse (\(ident, id) -> do
         x <- getVariableById id
         return (ident, id, x)) (toList (helper mappings))
     liftIO $ print vars

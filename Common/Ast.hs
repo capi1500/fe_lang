@@ -5,20 +5,13 @@ module Common.Ast where
 import Data.Map (Map)
 import Data.List (intercalate)
 
-import Fe.Abs (Ident (..))
-
 import Common.Types
 import Common.Utils
 import Common.Printer
 
-import TypeCheck.State
-import TypeCheck.Variable (Lifetime)
-
 
 mainFunction :: Identifier
-mainFunction = Identifier Nothing mainFunctionName
-mainFunctionName :: Ident
-mainFunctionName = Ident "main"
+mainFunction =  "main"
 
 type Pointer = Int
 
@@ -28,15 +21,12 @@ newtype Code = Code [Statement]
 data Statement =
     EmptyStatement |
     TypeStatement Type |
-    NewVariableStatement Ident Initialization | -- ident, is_reference, init
-    NewFunctionStatement Ident Expression [Ident] |
-    ExpressionStatement TypedExpression
+    NewVariableStatement Identifier Initialization | -- ident, is_reference, init
+    NewFunctionStatement Identifier Expression [Identifier] |
+    ExpressionStatement Expression
   deriving (Eq, Ord, Show, Read)
 
 data Initialization = VarInitialized Expression | VarUninitialized
-  deriving (Eq, Ord, Show, Read)
-
-data TypedExpression = TypedExpression Expression Type Lifetime -- expression, type of expression, lifetime of value that the expression holds
   deriving (Eq, Ord, Show, Read)
 
 data Expression =
@@ -47,15 +37,15 @@ data Expression =
     -- MatchExpression Expression [MatchArm]
     LiteralExpression Value |
     MakeArrayExpression [Value] |
-    VariableExpression Ident | -- variableId is valid for current frame
-    ReferenceExpression Ident |
+    VariableExpression Identifier | -- variableId is valid for current frame
+    ReferenceExpression Identifier |
     DereferenceExpression Expression |
     -- StructExpression Ident [StructExpressionField]
     -- ArrayExpressionItems [ArrayElement]
     -- ArrayExpressionDefault Expression Expression |
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
-    CallExpression Expression [(Ident, Expression)] | -- ident, is_reference, expression
+    CallExpression Expression [(Identifier, Expression)] | -- ident, is_reference, expression
     -- IndexExpression Expression Expression |
     -- UnaryExpression UnaryOperator Expression |
     UnaryMinusExpression Expression |
@@ -102,7 +92,7 @@ data Value =
     VChar Char |
     VBool Bool |
     VUnit |
-    VStruct (Map Ident Pointer) |
+    VStruct (Map Identifier Pointer) |
     VVariant Int Pointer | -- value_tag, value
     VFunction [Pointer] Expression | -- captures, code
     VArray Int [Pointer] | -- size, values

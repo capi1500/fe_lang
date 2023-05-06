@@ -10,13 +10,10 @@ instance CodePrint Code where
 instance CodePrint Statement where
     codePrint tabs EmptyStatement = ";\n"
     codePrint tabs (TypeStatement t) = printTabs tabs ++ show t
-    codePrint tabs (NewVariableStatement id (VarInitialized expr)) = printTabs tabs ++ "let " ++ codePrint tabs id ++ " = " ++ codePrint tabs expr ++ ";\n"
-    codePrint tabs (NewVariableStatement id VarUninitialized) = printTabs tabs ++ "let " ++ codePrint tabs id ++ ";\n"
-    codePrint tabs (NewFunctionStatement id expr params) = printTabs tabs ++ "fn " ++ codePrint tabs id ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ") " ++ codePrint tabs expr ++ "\n"
+    codePrint tabs (NewVariableStatement id (VarInitialized expr)) = printTabs tabs ++ "let " ++ id ++ " = " ++ codePrint tabs expr ++ ";\n"
+    codePrint tabs (NewVariableStatement id VarUninitialized) = printTabs tabs ++ "let " ++ id ++ ";\n"
+    codePrint tabs (NewFunctionStatement id expr params) = printTabs tabs ++ "fn " ++ id ++ "(" ++ intercalate ", " params ++ ") " ++ codePrint tabs expr ++ "\n"
     codePrint tabs (ExpressionStatement expr) = printTabs tabs ++ codePrint tabs expr
-
-instance CodePrint TypedExpression where
-    codePrint tabs (TypedExpression expr _ _) = codePrint tabs expr
 
 instance CodePrint Expression where
     codePrint tabs (BlockExpression statements) = "{\n" ++ intercalate "" (fmap (codePrint (tabs + 1)) statements) ++ "\n" ++ printTabs tabs ++ "}"
@@ -26,8 +23,8 @@ instance CodePrint Expression where
         codePrint tabs onTrue ++ 
         maybe "" (\onFalse -> "\n" ++ printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
     codePrint tabs (LiteralExpression value) = codePrint tabs value
-    codePrint tabs (VariableExpression ident) = codePrint tabs ident
-    codePrint tabs (ReferenceExpression ident) = "&" ++ codePrint tabs ident
+    codePrint tabs (VariableExpression ident) = ident
+    codePrint tabs (ReferenceExpression ident) = "&" ++ ident
     codePrint tabs (DereferenceExpression e) = "*" ++ codePrint tabs e
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (I32DoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2

@@ -9,20 +9,25 @@ import Fe.Abs (BNFC'Position, Ident (Ident))
 import Common.Utils
 import Common.Scope
 import Common.Types
+import Common.Printer
+import Common.AstPrinter
 
 import TypeCheck.Error
 import TypeCheck.Variable
 import Data.List (intercalate)
-import Common.Printer
+import Common.Ast (Expression)
 
-type TypeDefinitions = Scope (Map Ident Type)
-type VariableMappings = Scope (Map Ident VariableId)
+
+type TypeDefinitions = Scope (Map Identifier Type)
+type VariableMappings = Scope (Map Identifier VariableId)
 data Variables = Variables VariableMappings [Variable]
     deriving (Eq, Ord, Show, Read)
 data LifetimeState = LifetimeState Lifetime Int
     deriving (Eq, Ord, Show, Read)
 
-data Context = None | LValue | RValue
+data ExpressionType = PlaceType VariableId | ValueType Value | AssigneeType
+    deriving (Eq, Ord, Show, Read)
+data ExpressionContext = PlaceContext Mutable | ValueContext
     deriving (Eq, Ord, Show, Read)
 
 data PreprocessorState = PreprocessorState {
@@ -30,9 +35,13 @@ data PreprocessorState = PreprocessorState {
     variables :: Variables, -- follows code scopes, resets on function frames
     lifetimeState :: LifetimeState, -- current lifetime
     warnings :: [PreprocessorWarning], -- only grows
-    usedVariables :: Maybe VariableId,
-    context :: Context
+    context :: ExpressionContext,
+    toDropAtStatementEnd :: [VariableId],
+    position :: BNFC'Position
 } deriving (Eq, Ord, Show, Read)
+
+data TypedExpression = TypedExpression Expression ExpressionType -- expression, type of expression
+  deriving (Eq, Ord, Show, Read)
 
 type PreprocessorMonad a = StateT PreprocessorState (Except (PreprocessorError, PreprocessorState)) a
 
@@ -40,55 +49,69 @@ makePreprocessorState :: PreprocessorState
 makePreprocessorState = PreprocessorState {
     typeDefinitions = Global (
         fromList [
-            (Ident "i32", TPrimitive I32),
-            (Ident "char", TPrimitive Char),
-            (Ident "bool", TPrimitive Bool),
-            (Ident "()", TPrimitive Unit),
-            (Ident "String", TArray charType)]
+            ("i32", TPrimitive I32),
+            ("char", TPrimitive Char),
+            ("bool", TPrimitive Bool),
+            ("()", TPrimitive Unit),
+            ("String", TArray charType)]
     ),
     variables = Variables (Global empty) [],
     lifetimeState = LifetimeState staticLifetime 1,
     warnings = [],
-    usedVariables = Nothing,
-    context = None
+    context = ValueContext,
+    toDropAtStatementEnd = [],
+    position = Nothing
 }
 
 staticLifetime = Lifetime [0] 1
 
 putTypeDefinitions :: TypeDefinitions -> PreprocessorMonad ()
 putTypeDefinitions typeDefinitions = do
-    PreprocessorState _ variables currentLifetime warnings usedVariables context <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
+    PreprocessorState _ variables currentLifetime warnings context toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
 
 putVariables :: Variables -> PreprocessorMonad ()
 putVariables variables = do
-    PreprocessorState typeDefinitions _ currentLifetime warnings usedVariables context <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
+    PreprocessorState typeDefinitions _ currentLifetime warnings context toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
 
 putLifetimeState :: LifetimeState -> PreprocessorMonad ()
 putLifetimeState lifetimeState = do
-    PreprocessorState typeDefinitions variables _ warnings usedVariables context <- get
-    put $ PreprocessorState typeDefinitions variables lifetimeState warnings usedVariables context
+    PreprocessorState typeDefinitions variables _ warnings context toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables lifetimeState warnings context toDropAtStatementEnd position
 
 putWarnings :: [PreprocessorWarning] -> PreprocessorMonad ()
 putWarnings warnings = do
-    PreprocessorState typeDefinitions variables currentLifetime _ usedVariables context <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
-
-clearUsedVariables :: PreprocessorMonad ()
-clearUsedVariables = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings _ context <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings Nothing context
+    PreprocessorState typeDefinitions variables currentLifetime _ context toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
 
 addWarning :: PreprocessorWarning -> PreprocessorMonad ()
 addWarning warning = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime (warning:warnings) usedVariables context
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime (warning:warnings) context toDropAtStatementEnd position
 
-putContext :: Context -> PreprocessorMonad ()
+putContext :: ExpressionContext -> PreprocessorMonad ()
 putContext context = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables _ <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings usedVariables context
+    PreprocessorState typeDefinitions variables currentLifetime warnings _ toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+
+markVariableAsToDrop :: VariableId -> PreprocessorMonad ()
+markVariableAsToDrop id = do
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context (listPushBack id toDropAtStatementEnd) position
+
+clearVariablesToDrop :: PreprocessorMonad ()
+clearVariablesToDrop = do
+    PreprocessorState typeDefinitions variables currentLifetime warnings context _ position <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context [] position
+
+putPosition :: BNFC'Position -> PreprocessorMonad ()
+putPosition position = do
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd _ <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+
+instance CodePrint TypedExpression where
+    codePrint tabs (TypedExpression expr _) = codePrint tabs expr
 
 instance CodePrint Variables where
   codePrint tabs (Variables _ list) = "[" ++ intercalate ("\n" ++ printTabs tabs) (fmap show list) ++ "]"

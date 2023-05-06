@@ -4,15 +4,13 @@ import Prelude hiding (lookup)
 import Data.Map
 import Control.Monad.State
 
-import Fe.Abs (Ident)
-
 import Common.Utils
 import Common.Scope
 import Exec.State
 import Data.Maybe
 import Common.Ast
 
-addVariable :: Ident -> Variable -> ExecutorMonad Pointer
+addVariable :: Identifier -> Variable -> ExecutorMonad Pointer
 addVariable ident variable = do
     ExecutionState mappings variables <- get
     let id = length variables
@@ -29,13 +27,13 @@ addTmpVariable variable = do
     put $ ExecutionState mappings (listPushBack variable variables)
     return id
 
-getVariable :: Ident -> ExecutorMonad (Pointer, Variable)
+getVariable :: Identifier -> ExecutorMonad (Pointer, Variable)
 getVariable ident = do
     ExecutionState mappings variables <- get
     let id = helper mappings ident
     return (id, listGet id variables)
   where
-    helper :: VariableMappings -> Ident -> VariableId
+    helper :: VariableMappings -> Identifier -> VariableId
     helper (Global map) ident = fromJust (lookup ident map)
     helper (Local parent map) ident =
         let maybeId = lookup ident map in
@@ -51,7 +49,7 @@ setVariableById id value = do
   variables <- gets variables
   putVariables (listSet id (Variable value) variables)
 
-removeVariable :: Ident -> ExecutorMonad ()
+removeVariable :: Identifier -> ExecutorMonad ()
 removeVariable ident = do
     ExecutionState mappings variables <- get
     let id = length variables

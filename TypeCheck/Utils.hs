@@ -2,6 +2,7 @@ module TypeCheck.Utils where
 
 import Data.Map ( empty, insert, fromList, lookup, Map )
 import Data.Maybe (isNothing, isJust, fromJust)
+import Data.List (intercalate)
 import Control.Monad.Except
 import Control.Monad.State
 
@@ -11,15 +12,15 @@ import Common.Ast
 import Common.Types
 import Common.Utils
 import Common.Scope
+import Common.Printer
 
 import Fe.Abs (Ident)
 
-import TypeCheck.State hiding (Static)
+import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.Variable
-import Data.List (intercalate)
-import Common.Printer
-import TypeCheck.StateFunctions
+import TypeCheck.VariablesUtils
+import TypeCheck.LifetimeUtils
 
 assertType :: Type -> Type -> A.BNFC'Position -> PreprocessorMonad ()
 assertType actualType expectedType p = do
@@ -41,6 +42,26 @@ isUnInitialized (A.UnInitialized _) = True
 isInitialized :: A.Initialization -> Bool
 isInitialized (A.Initialized _ _) = True
 isInitialized (A.UnInitialized _) = False
+
+-- isPlaceExpression :: ExpressionType -> Bool
+-- isPlaceExpression (PlaceType _) = True
+-- isPlaceExpression _ = False
+
+-- isMutablePlaceExpression :: ExpressionContext -> Bool
+-- isMutablePlaceExpression (PlaceContext Mutable) = True
+-- isMutablePlaceExpression _ = False
+
+-- isImmutablePlaceExpression :: ExpressionContext -> Bool
+-- isImmutablePlaceExpression (PlaceContext Const) = True
+-- isImmutablePlaceExpression _ = False
+
+-- isValueExpression :: ExpressionType -> Bool
+-- isValueExpression (ValueType _) = True
+-- isValueExpression _ = False
+
+-- isAssigneeExpression :: ExpressionType -> Bool
+-- isAssigneeExpression Assignee = True
+-- isAssigneeExpression _ = False
 
 -- TODO: deal with annotated lifetimes
 modifyType :: Type -> A.TypeModifier -> PreprocessorMonad Type
@@ -64,8 +85,8 @@ getShortestLifetime p variables = do
     when (null variables) $ throw (CannotMakeEmptyReference p)
     zipped <- traverse (\id -> do
         variable <- getVariableById id
-        let Identifier position _ = variableIdentifier variable
-        return (lifetime variable, position)) variables
+        let position = createdAt variable
+        return (getVariablesValueLifetime variable, position)) variables
     let head:tail = zipped
     (l, p) <- foldM helper head tail
     return l
@@ -101,22 +122,23 @@ nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariant _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
 
+
 -- tries to dereference a variable, which is currently marked as used
 -- it can be only done after expression parsed in LValue context
 -- Assumes:
 --  - used variable is a 
 --      - temporary referenece
 --      - it mutably borrows a non-temporary variable
-deref :: PreprocessorMonad (VariableId, Variable)
-deref = do
-    maybeUsed <- gets usedVariables
-    let variableRefId = fromJust maybeUsed
-    variableRef <- getVariableById variableRefId
-    handleUsedVariables moveOutVariable
+-- deref :: PreprocessorMonad (VariableId, Variable)
+-- deref = do
+--     maybeUsed <- gets usedVariable
+--     let variableRefId = fromJust maybeUsed
+--     variableRef <- getVariableById variableRefId
+--     handleUsedVariables moveOutVariable
 
-    let TReference _ t = variableType variableRef
-    unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (Fatal "LValue references more than 1 mutable reference")
+--     let TReference _ t = variableType variableRef
+--     unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (Fatal "LValue references more than 1 mutable reference")
 
-    let variableId = head (borrowsMut variableRef)
-    variable <- getVariableById variableId
-    return (variableId, variable)
+--     let variableId = head (borrowsMut variableRef)
+--     variable <- getVariableById variableId
+--     return (variableId, variable)

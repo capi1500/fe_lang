@@ -6,12 +6,8 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.Maybe (isNothing)
 import Common.Printer
-type Identifier = Identifier' A.BNFC'Position
-data Identifier' a = Identifier a A.Ident
-  deriving (Eq, Ord, Show, Read)
 
-instance CodePrint (Identifier' a) where
-    codePrint _ (Identifier _ (A.Ident ident)) = ident
+type Identifier = String
 
 listSet :: Int -> a -> [a] -> [a]
 listSet id value list =

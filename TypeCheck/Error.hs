@@ -12,21 +12,21 @@ import TypeCheck.Variable
 import Common.Printer
 
 data PreprocessorError =
-    TypeAlreadyInScope Identifier Type Type | -- ident, new definition, old definition
-    TypeNotDefined Identifier |
+    TypeAlreadyInScope BNFC'Position Identifier Type Type | -- ident, new definition, old definition
+    TypeNotDefined BNFC'Position Identifier |
     TypeMismatch BNFC'Position Type Type | -- ident, ident actual type, ident expected type
     ExpressionNotCallable BNFC'Position Type |
     IllegalInLValue BNFC'Position |
     IllegalInRValue BNFC'Position |
-    VariableNotDefined Identifier |
-    ConstantNotInitialized Identifier |
-    VariableAtGlobalScope Identifier |
+    VariableNotDefined BNFC'Position Identifier |
+    ConstantNotInitialized BNFC'Position Identifier |
+    VariableAtGlobalScope BNFC'Position Identifier |
     UninitializedVariableUsed BNFC'Position Identifier | -- where, defined
     UseAfterMoved BNFC'Position VariableId |
     AssignmentToConstant BNFC'Position VariableId |
     AlreadyBorrowed VariableId BNFC'Position |
     CannotMoveOut Variable |
-    LifetimesMismatch BNFC'Position BNFC'Position  Lifetime Lifetime | -- if position is nothing -> lifetime is static
+    LifetimesMismatch BNFC'Position BNFC'Position Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |
     CannotTakeMutableReferenceToConstant BNFC'Position VariableId |
     CannotDerefNotReference BNFC'Position Type |
@@ -37,8 +37,8 @@ data PreprocessorError =
   deriving (Eq, Ord, Show, Read)
 
 data PreprocessorWarning =
-    Shadow Identifier Identifier |
-    VariableNotInitializedNotUsed Identifier |
+    Shadow Identifier VariableId |
+    VariableNotInitializedNotUsed VariableId |
     Debug String
   deriving (Eq, Ord, Show, Read)
 

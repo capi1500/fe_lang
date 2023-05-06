@@ -11,14 +11,13 @@ import Common.Utils
 import Common.Ast
 import Common.Scope
 import Data.Map
-import Fe.Abs (Ident)
 
 type VariableId = Int
 
 data Variable = Variable Value | Uninitialized
   deriving (Eq, Ord, Show, Read)
 
-type VariableMappings = Scope (Map Ident VariableId)
+type VariableMappings = Scope (Map Identifier VariableId)
 data ExecutionState = ExecutionState {
     variableMappings :: VariableMappings,
     variables :: [Variable]

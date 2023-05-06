@@ -25,7 +25,7 @@ instance Executable Code () where
     execute (Code statements) = do
         traverse_ initializeGlobalScope statements
         ExecutionState _ mainId <- get
-        (_, Variable (VFunction _ code)) <- getVariable mainFunctionName
+        (_, Variable (VFunction _ code)) <- getVariable mainFunction
         x <- execute code :: ExecutorMonad Value
         liftIO $ print x
         return ()
@@ -51,7 +51,7 @@ instance Executable Statement Value where
         let value = Variable $ VFunction [] expression
         addVariable ident value
         return VUnit
-    execute (ExpressionStatement (TypedExpression expression _ _)) = do
+    execute (ExpressionStatement expression) = do
         execute expression
 
 instance Executable Initialization Variable where

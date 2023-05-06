@@ -96,6 +96,10 @@ getStricterOfFunctionKinds FnOnce _ = FnOnce
 getStricterOfFunctionKinds _ FnOnce = FnOnce
 getStricterOfFunctionKinds Fn Fn = Fn
 
+isCopy :: Type -> Bool
+isCopy (TPrimitive _) = True
+isCopy t = isNamedFunction t
+
 data Field = Field Identifier Type
   deriving (Eq, Ord, Show, Read)
 
@@ -127,8 +131,8 @@ isMutable Mutable = True
 instance CodePrint Type where
     codePrint tabs TUntyped = "Untyped"
     codePrint tabs (TPrimitive p) = show p
-    codePrint tabs (TStruct (Identifier _ ident) _) = "struct " ++ codePrint tabs ident
-    codePrint tabs (TVariant (Identifier _ ident) _) = "variant " ++ codePrint tabs ident
+    codePrint tabs (TStruct ident _) = "struct " ++ ident
+    codePrint tabs (TVariant ident _) = "variant " ++ ident
     codePrint tabs (TFunction name kind params ret) = show kind ++ codePrint tabs name ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
     codePrint tabs (TArray t) = "[" ++ codePrint tabs t ++ "]"
     codePrint tabs (TReference Const t) = "&" ++ codePrint tabs t
@@ -138,5 +142,5 @@ instance CodePrint FunctionParam where
     codePrint tabs (FunctionParam _ t) = codePrint tabs t
 
 instance CodePrint FunctionName where
-    codePrint tabs (NamedFunction (Identifier _ ident)) = " " ++ codePrint tabs ident
+    codePrint tabs (NamedFunction ident) = " " ++ ident
     codePrint tabs Unnamed = ""
