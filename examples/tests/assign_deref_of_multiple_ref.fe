@@ -4,11 +4,11 @@ fn main() -> i32 {
     var b1 = &mut a1; // has mutable reference to a1
     var b2 = &mut a2; // has mutable reference to a2
     var c = if (true) { &mut b1 } else { &mut b2 }; // has mutable reference to b1 and b2
-    var d = *c; // (*c) should move out, but fail because c is a reference
-    *d
+    //var d = *c; // (*c) should move out, but fail because c is a reference
+    //*d
     // but following
-    //var d = **c; // should be ok
-    //d
+    var d = **c; // should be ok
+    d
 }
 
 /*

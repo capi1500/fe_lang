@@ -71,8 +71,8 @@ typeCheckStage code =
 handleTypeCheckError :: (Either PreprocessorError Code, PreprocessorState) -> IO PreprocessorOutput
 handleTypeCheckError (Left err, state) = do
     putStrLn "Error in type checker"
-    print err
     printWarnings state
+    print err
     exitFailure
 handleTypeCheckError (Right ast, state) = do
     printWarnings state

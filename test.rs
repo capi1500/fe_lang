@@ -86,14 +86,13 @@ fn l() {
 // 	println!("{}", x);
 // }
 
-fn n() {
-	let mut a = 1;
-	let mut b = &mut a;
-	let mut c = &mut b;
-	// let mut d = *c;
-	// println!("{}", *d);
-	let mut d 
-}
+// fn n() {
+// 	let mut a = 1;
+// 	let mut b = &mut a;
+// 	let mut c = &mut b;
+// 	let mut d = *c;
+// 	println!("{}", *d);
+// }
 
 /*
 error[E0507]: cannot move out of `*c` which is behind a mutable reference
@@ -127,16 +126,21 @@ error[E0507]: cannot move out of `*c` which is behind a mutable reference
     |                 help: consider borrowing here: `&*c`
    */
 
-fn o() {
-	let a: &i32;
-	let z: &&i32 = {
-		let n = 5;
-		a = &n;
-		&a
-	};
-	println!("{}", **z)
+// fn o() {
+// 	let a: &i32;
+// 	let z: &&i32 = {
+// 		let n = 5;
+// 		a = &n;
+// 		&a
+// 	};
+// 	println!("{}", **z)
+// }
+
+fn p() {
+	let mut a = 1;
+	*(&mut a);
 }
 
 fn main() {
-	n();
+	p();
 }

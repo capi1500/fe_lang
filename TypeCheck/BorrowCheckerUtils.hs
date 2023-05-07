@@ -15,36 +15,6 @@ import Text.XHtml (variable)
 import Data.Maybe
 import Common.Printer
 
--- transferOwnership  :: VariableId -> VariableId -> PreprocessorMonad ()
--- transferOwnership newOwnerId movedOutId = do
---     newOwner <- getVariableById newOwnerId
---     movedOut <- getVariableById movedOutId
-
---     shouldMove <- internalShouldMove movedOut
---     if not shouldMove then do return ()
---     else do
-
---     addWarning $ Debug ("Transfering " ++ show movedOutId ++ " to " ++ show newOwnerId)
-
---     newOwnerBorrows <- foldM (transferBorrow newOwnerId movedOutId) (borrows newOwner) (borrows movedOut)
---     newOwnerBorrowsMut <- foldM (transferMutBorrow newOwnerId) (borrowsMut newOwner) (borrowsMut movedOut)
-
---     setVariableById newOwnerId (changeVariable (variableState newOwner) (nub newOwnerBorrows) (nub newOwnerBorrowsMut) newOwner)
---     setVariableById movedOutId (changeVariable Moved [] [] movedOut)
---   where
---     transferBorrow :: VariableId -> VariableId -> [VariableId] -> VariableId -> PreprocessorMonad [VariableId]
---     transferBorrow newOwnerId movedOutId combinedBorrowsList borrowedId = do
---         variable <- getVariableById borrowedId
---         let Borrowed whatBorrowed = variableState variable
---         let whatBorrowed' = delete movedOutId whatBorrowed
---         let whatBorrowed'' = Data.Set.insert newOwnerId whatBorrowed'
---         setVariableById borrowedId (setVariableState (Borrowed whatBorrowed'') variable)
---         return $ borrowedId:combinedBorrowsList
---     transferMutBorrow :: VariableId -> [VariableId] -> VariableId -> PreprocessorMonad [VariableId]
---     transferMutBorrow newOwnerId combinedBorrowsList borrowedId = do
---         mutateVariableById borrowedId (setVariableState (BorrowedMut newOwnerId))
---         return $ borrowedId:combinedBorrowsList
-
 borrow :: VariableId -> PreprocessorMonad ()
 borrow borrowedId = borrowInternal borrowedId markAsBorrowed
   where
@@ -97,7 +67,7 @@ moveOutById variableId = do
 moveOut :: Variable -> PreprocessorMonad ()
 moveOut variable = do
     p <- gets position
-    addWarning $ Debug ("Moving out " ++ show (variableId variable) ++ " " ++ show (variableName variable) ++ " at " ++ show p)
+    addWarning $ Debug ("Moving out " ++ codePrint 1 variable ++ " at " ++ show p)
     let state = variableState variable
     if state == Moved then do
         return ()
