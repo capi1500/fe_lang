@@ -101,24 +101,3 @@ nameOfItem (A.ItemFunction _ (A.Ident ident) _ _ _ _) = ident
 nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariant _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
-
-
--- tries to dereference a variable, which is currently marked as used
--- it can be only done after expression parsed in LValue context
--- Assumes:
---  - used variable is a 
---      - temporary referenece
---      - it mutably borrows a non-temporary variable
--- deref :: PreprocessorMonad (VariableId, Variable)
--- deref = do
---     maybeUsed <- gets usedVariable
---     let variableRefId = fromJust maybeUsed
---     variableRef <- getVariableById variableRefId
---     handleUsedVariables moveOutVariable
-
---     let TReference _ t = variableType variableRef
---     unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (Fatal "LValue references more than 1 mutable reference")
-
---     let variableId = head (borrowsMut variableRef)
---     variable <- getVariableById variableId
---     return (variableId, variable)

@@ -24,7 +24,7 @@ instance CodePrint Expression where
         maybe "" (\onFalse -> "\n" ++ printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
     codePrint tabs (LiteralExpression value) = codePrint tabs value
     codePrint tabs (VariableExpression ident) = ident
-    codePrint tabs (ReferenceExpression ident) = ident
+    codePrint tabs (ReferenceExpression ident) = "&" ++ ident
     codePrint tabs (DereferenceExpression e) = "*" ++ codePrint tabs e
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (I32DoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
@@ -34,7 +34,7 @@ instance CodePrint Expression where
             show (fmap (\(VChar c) -> c) values)
         else
             "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
-    codePrint tabs (AssignmentExpression _ e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
+    codePrint tabs (AssignmentExpression e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
     codePrint tabs expr = show expr
 
 instance CodePrint Value where
@@ -43,6 +43,7 @@ instance CodePrint Value where
     codePrint _ (VBool b) = show b
     codePrint _ VUnit = "()"
     codePrint _ (VReference ptr) = "ptr(" ++ show ptr ++ ")"
+    codePrint _ (VArray _) = "[" ++ "<internal>" ++ "]"
     codePrint _ _ = "<internal>"
 
 instance CodePrint BooleanDoubleOperator where

@@ -25,9 +25,10 @@ data Variables = Variables VariableMappings [Variable]
 data LifetimeState = LifetimeState Lifetime Int
     deriving (Eq, Ord, Show, Read)
 
+-- data PlaceContextType = ImmutablePlaceContext | MutablePlaceContext | AssigneeContet
 data ExpressionContext = PlaceContext Mutable | ValueContext
     deriving (Eq, Ord, Show, Read)
-data ExpressionType = PlaceType VariableId | ValueType Value
+data ExpressionType = PlaceType Mutable VariableId | ValueType Value
     deriving (Eq, Ord, Show, Read)
 
 data PreprocessorState = PreprocessorState {
@@ -112,3 +113,11 @@ putPosition position = do
 
 throw :: PreprocessorError -> PreprocessorMonad a
 throw = throwError
+
+isPlaceContext :: ExpressionContext -> Bool
+isPlaceContext (PlaceContext _) = True
+isPlaceContext ValueContext = False
+
+isValueContext :: ExpressionContext -> Bool
+isValueContext (PlaceContext _) = False
+isValueContext ValueContext = True

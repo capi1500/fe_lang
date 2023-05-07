@@ -1,7 +1,7 @@
 module TypeCheck.StateUtils where
 
 import Data.List
-import Data.Foldable
+import Data.Foldable hiding (toList)
 import Data.Map
 import Control.Monad.State
 
@@ -53,7 +53,7 @@ reproduceWithPersistent :: PreprocessorState -> PreprocessorMonad ()
 reproduceWithPersistent state = do
     variables <- gets variables
     let Variables (Local _ map) _ = variables
-    traverse_ moveOutById (reverse (elems map))
+    traverse_ moveOutById (sortBy (flip compare) (elems map))
 
     warnings <- gets warnings
     LifetimeState _ id <- gets lifetimeState
@@ -77,19 +77,3 @@ endStatement = do
     toDrop <- gets toDropAtStatementEnd
     traverse_ moveOutById toDrop
     clearVariablesToDrop
-
-
--- getExpressionTypeType :: ExpressionType -> PreprocessorMonad Type
--- getExpressionTypeType (PlaceType variableId) = do
---     variable <- getVariableById variableId
---     return $ variableType variable
--- getExpressionTypeType (ValueType value) = 
---     return $ valueType value
-
-
--- getExpressionTypeLifetime :: ExpressionType -> PreprocessorMonad Lifetime
--- getExpressionTypeLifetime (PlaceType variableId) = do
---     variable <- getVariableById variableId
---     return $ lifetime variable
--- getExpressionTypeLifetime (ValueType value) = 
---     return staticLifetime

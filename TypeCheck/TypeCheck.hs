@@ -39,15 +39,16 @@ class TypeCheck a b where
 
 instance TypeCheck A.Type Type where
     typeCheck :: A.Type -> PreprocessorMonad Type
-    typeCheck (A.TypeSimple p modifier (A.Ident ident)) = do
-        t <- getType ident
-        modifyType t modifier
-    typeCheck (A.TypeArray _ modifier (A.ArrayType p t)) = do
+    typeCheck (A.TypeSimple p (A.Ident ident)) = do
+        getType ident
+    typeCheck (A.TypeArray _ (A.ArrayType p t)) = do
         t' <- typeCheck t
         return $ arrayType t'
+    typeCheck (A.TypeModified _ modifier t) = do
+        t' <- typeCheck t
+        modifyType t' modifier
     typeCheck (A.TypeFunction p functionKind lifetime params returnType) = do
-    throw $ Other "Not yet implemented" p
-
+        throw $ Other "Type functions not yet implemented" p
 
 instance TypeCheck A.Code Code where
     typeCheck :: A.Code -> PreprocessorMonad Code
@@ -79,10 +80,10 @@ addToScope (A.ItemFunction p (A.Ident ident) lifetimes params returnType _) = do
     return ()
 addToScope (A.ItemStruct p ident lifetimes fields) = do
     putPosition p
-    throw $ Other "Not yet implemented" p
+    throw $ Other "Structs not yet implemented" p
 addToScope (A.ItemVariant p ident lifetimes types) = do
     putPosition p
-    throw $ Other "Not yet implemented" p
+    throw $ Other "Variants not yet implemented" p
 addToScope (A.ItemVariable p cv (A.Ident ident) typeDeclaration initialization) = do
     putPosition p
     scope <- gets typeDefinitions
@@ -129,7 +130,7 @@ instance TypeCheck A.Item Statement where
                 paramIds <- traverse addFunctionParam (zip declaredParams (fmap hasPosition params))
                 (expression', value) <- typeCheckInValueContext expression
                 -- TODO: check if any dangling reference is returned
-                unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Not yet implemented" p)
+                unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
                 dropValue value
                 return (expression', valueType value, paramIds)
 
@@ -138,10 +139,10 @@ instance TypeCheck A.Item Statement where
 
     typeCheck (A.ItemStruct p ident lifetimes fields) = do
         putPosition p
-        throw $ Other "Not yet implemented" p
+        throw $ Other "Structs not yet implemented" p
     typeCheck (A.ItemVariant p ident lifetimes subtypes) = do
         putPosition p
-        throw $ Other "Not yet implemented" p
+        throw $ Other "Variants not yet implemented" p
     typeCheck (A.ItemVariable p cv (A.Ident name) typeDeclaration initialization) = do
         putPosition p
         when (isConstCV cv && isUnInitialized initialization) $ throw $ ConstantNotInitialized p name
@@ -150,21 +151,20 @@ instance TypeCheck A.Item Statement where
         declaredType <- typeCheck typeDeclaration
         initialization' <- if isInitialized initialization then do
             let A.Initialized _ expression = initialization
-            (expression', variableId) <- typeCheckInPlaceContext Const expression
+            (expression', value) <- typeCheckInValueContext expression
 
-            mutateVariableById variableId (mutateVariableValue (setValueOwned False))
-            variable <- getVariableById variableId
-            let value = setValueOwned True (variableValue variable)
-            let initializationLifetime = lifetime variable
             let initializedType = valueType value
 
             when (declaredType /= TUntyped) $ assertType p declaredType initializedType
 
-            lifetime <- getLifetime
-            unless (isSubLifetime initializationLifetime lifetime) $ throw (LifetimesMismatch p (hasPosition expression) lifetime initializationLifetime)
+            -- lifetime <- getLifetime
+            -- unless (isSubLifetime initializationLifetime lifetime) $ throw (LifetimesMismatch p (hasPosition expression) lifetime initializationLifetime)
 
-            moveOutOrCopyById variableId
-            addVariable name mutability value
+            addVariable name mutability (setValueOwned True value)
+            -- let expression'' = if isNothing (variableName variable) then
+            --         expression'
+            --     else
+            --         DereferenceExpression expression'
             return $ VarInitialized expression'
         else do
             addUninitializedVariable name mutability declaredType
@@ -250,8 +250,7 @@ instance TypeCheck A.Expression TypedExpression where
             (function', id) <- typeCheckInPlaceContext Const function
             return (id, function')
         
-        (borrowedValue, borrowedPointer) <- makeImplicitBorrowValue functionId Const
-        markVariableAsToDrop borrowedPointer
+        borrowedValue <- makeImplicitBorrowValue functionId Const
         let TReference Const functionType = valueType borrowedValue
         unless (isFunction functionType) $ do throw (ExpressionNotCallable p functionType)
 
@@ -264,7 +263,7 @@ instance TypeCheck A.Expression TypedExpression where
             return (paramIdent, paramExpression)
 
         params' <- traverse paramCheck (zip declaredParams params)
-
+        dropValue borrowedValue
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         et <- createValueExpression (makeValue p returnType False)
         return $ TypedExpression (CallExpression function' params') et 
@@ -282,68 +281,54 @@ instance TypeCheck A.Expression TypedExpression where
             return e'
         expressionType <- createValueExpression (makeValue p boolType False)
         return $ TypedExpression (UnaryNegationExpression e') expressionType
-    -- typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
-    --     context <- gets context
-    --     putContext RValue
-    --     TypedExpression e' t l _ <- typeCheck e
-    --     putContext context
-    --     unless (isReference t) $ throw (CannotDerefNotReference p t)
-    --     let TReference mutability innerT = t
-    --     whenContext
-    --         (do
-    --             maybeUsed <- gets usedVariable
-    --             let variableRefId = fromJust maybeUsed -- reference was returned, so there must be a usedVariable
-    --             variableRef <- getVariableById variableRefId
+    typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
+        (e', placeId) <- withinContext $ do
+            context <- gets context
+            putContext (case context of
+                PlaceContext mutability -> PlaceContext mutability
+                ValueContext -> PlaceContext Const)
+            putPosition (hasPosition e)
 
-    --             unless (null (borrows variableRef) && length (borrowsMut variableRef) == 1) $ throw (CannotDerefReferenceToMultipleVariables p variableRefId)
+            TypedExpression e' et <- typeCheck e
+            let PlaceType mutability placeId = et
+            return (e', placeId)
+        
+        borrowedVariable <- getVariableById placeId
+        addWarning $ Debug ("Attempting to deref " ++ codePrint 1 borrowedVariable)
+        
+        let t = variableType borrowedVariable
+        unless (isReference t) $ throw (CannotDerefNotReference p t)
 
-    --             -- Because it lvalue, returning a reference holding at most 1 mutable borrow
-    --             printUsedVariables "LValue deref: "
-    --             printVariables
-    --             return $ TypedExpression e' t l
-    --         )
-    --         (do
-    --             derefedVariableId <- addTemporaryVariable p mutability innerT
-    --             lifetime <- if isReference innerT then do
-    --                 handleUsedVariables (transferOwnership derefedVariableId)
-    --                 markVariableUsed derefedVariableId
+        let borrowedValue = variableValue borrowedVariable
+        let borrows' = borrows borrowedValue
+        let borrowsMut' = borrowsMut borrowedValue
+        -- unless (length borrows' + length borrowsMut' == 1) $ throw (CannotDerefReferenceToMultipleVariables p)
 
-    --                 derefedVariable <- getVariableById derefedVariableId
-    --                 lifetime <- getShortestLifetime p (borrows derefedVariable ++ borrowsMut derefedVariable)
-    --                 mutateVariableById derefedVariableId (setVariableLifetime lifetime)
-    --                 return lifetime
-    --             else do
-    --                 handleUsedVariables moveOutVariable
-    --                 return staticLifetime
-                
-    --             printUsedVariables "RValue deref: "
-    --             printVariables
-    --             return $ TypedExpression (DereferenceExpression e') innerT lifetime
-    --         )
-    -- typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
-    --     whenLValue $ throw (IllegalInLValue p)
-    --     putContext LValue
-    --     TypedExpression e' t l _ <- typeCheck e
-    --     (derefedVariableId, derefedVariable) <- deref
-    --     let t' = TReference Const (variableType derefedVariable)
-    --     referenceTempVariableId <- addTemporaryVariable p Const t'
-    --     borrowVariable p referenceTempVariableId derefedVariableId
-    --     markVariableUsed referenceTempVariableId
-    --     printUsedVariables "Ref: "
-    --     printVariables
-    --     return $ TypedExpression e' t' l
-    -- typeCheck (A.UnaryExpression _ (A.ReferenceMut p) e) = do
-    --     whenLValue $ throw (IllegalInLValue p)
-    --     putContext LValue
-    --     TypedExpression e' t l _ <- typeCheck e
-    --     (derefedVariableId, derefedVariable) <- deref
-    --     let t' = TReference Mutable (variableType derefedVariable)
-    --     referenceTempVariableId <- addTemporaryVariable p Const t'
-    --     borrowMutVariable p referenceTempVariableId derefedVariableId
-    --     markVariableUsed referenceTempVariableId
-    --     printUsedVariables "Ref mut: "
-    --     printVariables
-    --     return $ TypedExpression e' t' l
+        let derefedPlaceId = if null borrows' then
+                head borrowsMut'
+            else
+                head borrows'
+        moveOut borrowedVariable
+        context <- gets context
+        et <- if isValueContext context then do
+            id <- makeImplicitBorrowValue derefedPlaceId Const
+            et <- createPlaceExpression derefedPlaceId
+            dropValue id
+            return et
+        else do
+            createPlaceExpression derefedPlaceId
+
+        return $ TypedExpression (DereferenceExpression e') et
+    typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
+        (e', borrowedId) <- typeCheckInPlaceContext Const e
+        v <- makeBorrow borrowedId Const
+        et <- createValueExpression v
+        return $ TypedExpression e' et
+    typeCheck (A.UnaryExpression _ (A.ReferenceMut p) e) = do
+        (e', borrowedId) <- typeCheckInPlaceContext Mutable e
+        v <- makeBorrow borrowedId Mutable
+        et <- createValueExpression v
+        return $ TypedExpression e' et
     typeCheck (A.LiteralExpression p literal) = do
         putPosition p
         typeCheck literal
@@ -370,10 +355,11 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.ComparisonExpression p e1 operator e2) = do
         putPosition p
         makeComparisonOperatorExpression operator e1 e2
-    -- typeCheck (A.AssignmentExpression _ e1 operator e2) = do
-    --     makeAssignmentOperatorExpression operator e1 e2
+    typeCheck (A.AssignmentExpression p e1 operator e2) = do
+        putPosition p
+        makeAssignmentExpression operator e1 e2
     typeCheck x = do
-        throw $ Other "Not yet implemented" (hasPosition x)
+        throw $ Other "Expression not yet implemented" (hasPosition x)
 
 makeI32DoubleOperatorExpression :: A.BNFC'Position -> A.Expression -> A.Expression -> NumericDoubleOperator  -> PreprocessorMonad TypedExpression
 makeI32DoubleOperatorExpression p e1 e2 operator = do
@@ -387,14 +373,14 @@ makeI32DoubleOperatorExpression p e1 e2 operator = do
 makeComparisonOperatorExpression :: A.ComparisonOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
 makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     (e1', id1) <- typeCheckInPlaceContext Const e1
-    (v1, tmp1) <- makeImplicitBorrowValue id1 Const
+    v1 <- makeImplicitBorrowValue id1 Const
     (e2', id2) <- typeCheckInPlaceContext Const e2
-    (v2, tmp2) <- makeImplicitBorrowValue id2 Const
+    v2 <- makeImplicitBorrowValue id2 Const
     printVariables
     assertType p (valueType v1) (valueType v2)
     expressionType <- createValueExpression (makeValue p boolType False)
-    moveOutById tmp1
-    moveOutById tmp2
+    dropValue v1
+    dropValue v2
     return $ TypedExpression (BoolDoubleOperatorExpression Equals e1' e2') expressionType
 makeComparisonOperatorExpression (A.Greater p) e1 e2 = do
     makeI32ComparisonExpression e1 e2 Greater
@@ -413,57 +399,51 @@ makeComparisonOperatorExpression (A.SmallerEquals p) e1 e2 = do
 makeI32ComparisonExpression :: A.Expression -> A.Expression -> BooleanDoubleOperator -> PreprocessorMonad TypedExpression
 makeI32ComparisonExpression e1 e2 operator = do
     (e1', id1) <- typeCheckInPlaceContext Const e1
-    (v1, tmp1) <- makeImplicitBorrowValue id1 Const
+    v1 <- makeImplicitBorrowValue id1 Const
     (e2', id2) <- typeCheckInPlaceContext Const e2
-    (v2, tmp2) <- makeImplicitBorrowValue id2 Const
+    v2 <- makeImplicitBorrowValue id2 Const
     printVariables
 
     assertType (hasPosition e1) (valueType v1) (TReference Const i32Type) -- here its a reference to int vs int
     assertType (hasPosition e2) (valueType v2) (TReference Const i32Type)
     expressionType <- createValueExpression (makeValue (hasPosition e1) boolType False)
-    moveOutById tmp1
-    moveOutById tmp2
+    dropValue v1
+    dropValue v2
     printVariables
     return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') expressionType
 
--- makeAssignmentOperatorExpression :: A.AssignmentOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
--- makeAssignmentOperatorExpression (A.PlusEqual p) e1 e2 = do makeAssignmentOperatorExpression' Plus e1 e2
--- makeAssignmentOperatorExpression (A.MinusEqual p) e1 e2 = do makeAssignmentOperatorExpression' Minus e1 e2
--- makeAssignmentOperatorExpression (A.MultiplyEqual p) e1 e2 = do makeAssignmentOperatorExpression' Multiply e1 e2
--- makeAssignmentOperatorExpression (A.DivideEqual p) e1 e2 = do makeAssignmentOperatorExpression' Divide e1 e2
--- makeAssignmentOperatorExpression (A.ModuloEqual p) e1 e2 = do makeAssignmentOperatorExpression' Modulo e1 e2
--- makeAssignmentOperatorExpression (A.AndEqual p) e1 e2 = do makeAssignmentOperatorExpression' BitAnd e1 e2
--- makeAssignmentOperatorExpression (A.OrEqual p) e1 e2 = do makeAssignmentOperatorExpression' BitOr e1 e2
--- makeAssignmentOperatorExpression (A.XorEqual p) e1 e2 = do makeAssignmentOperatorExpression' BitXor e1 e2
--- makeAssignmentOperatorExpression (A.LShiftEqual p) e1 e2 = do makeAssignmentOperatorExpression' LShift e1 e2
--- makeAssignmentOperatorExpression (A.RShiftEqual p) e1 e2 = do makeAssignmentOperatorExpression' RShift e1 e2
--- makeAssignmentOperatorExpression (A.Assign p) e1 e2 = do
---     putContext LValue
---     TypedExpression e1' _ l1 _ <- typeCheck e1
---     (assignedVariableId, assignedVariable) <- deref
+makeAssignmentExpression :: A.AssignmentOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
+makeAssignmentExpression (A.PlusEqual p) e1 e2 = do makeCompoundAssignmentExpression Plus e1 e2
+makeAssignmentExpression (A.MinusEqual p) e1 e2 = do makeCompoundAssignmentExpression Minus e1 e2
+makeAssignmentExpression (A.MultiplyEqual p) e1 e2 = do makeCompoundAssignmentExpression Multiply e1 e2
+makeAssignmentExpression (A.DivideEqual p) e1 e2 = do makeCompoundAssignmentExpression Divide e1 e2
+makeAssignmentExpression (A.ModuloEqual p) e1 e2 = do makeCompoundAssignmentExpression Modulo e1 e2
+makeAssignmentExpression (A.AndEqual p) e1 e2 = do makeCompoundAssignmentExpression BitAnd e1 e2
+makeAssignmentExpression (A.OrEqual p) e1 e2 = do makeCompoundAssignmentExpression BitOr e1 e2
+makeAssignmentExpression (A.XorEqual p) e1 e2 = do makeCompoundAssignmentExpression BitXor e1 e2
+makeAssignmentExpression (A.LShiftEqual p) e1 e2 = do makeCompoundAssignmentExpression LShift e1 e2
+makeAssignmentExpression (A.RShiftEqual p) e1 e2 = do makeCompoundAssignmentExpression RShift e1 e2
+makeAssignmentExpression (A.Assign p) e1 e2 = do
+    (e1', placeId) <- typeCheckInPlaceContext Mutable e1
+    place <- getVariableById placeId
+    let t1 = variableType place
+    when (variableState place == Free) $ dropValue (variableValue place)
     
---     let state = variableState assignedVariable
---     let t1 = variableType assignedVariable
+    (e2', newValue) <- typeCheckInValueContext e2    
+    let t2 = valueType newValue
 
---     when (variableMutability assignedVariable == Const) $ throw (AssignmentToConstant p assignedVariableId)
---     printUsedVariables "Assignment left: "
---     printVariables
---     when (state == Free) $ moveOutVariable assignedVariableId
-    
---     putContext RValue
---     TypedExpression e2' t2 l2 _ <- typeCheck e2
---     assertType t1 t2 p
+    assertType p t1 t2
 
---     printUsedVariables "Assignment Right: "
---     handleUsedVariables (transferOwnership assignedVariableId)
---     mutateVariableById assignedVariableId (setVariableState Free)
---     printVariables
+    mutateVariableById placeId (setVariableState Free)
+    mutateVariableById placeId (mutateVariableValue (const newValue))
+    printVariables
 
---     return $ TypedExpression (AssignmentExpression (isReference t1) e1' e2') unitType staticLifetime
+    et <- createValueExpression (makeValue (hasPosition e1) unitType False)
+    return $ TypedExpression (AssignmentExpression e1' e2') et
 
--- makeAssignmentOperatorExpression' :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
--- makeAssignmentOperatorExpression' op e1 e2 = do
---     throw $ Other "Not yet implemented" (hasPosition e1)
+makeCompoundAssignmentExpression :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
+makeCompoundAssignmentExpression op e1 e2 = do
+    throw $ Other "Compound assignment not yet implemented" (hasPosition e1)
     -- TypedExpression e1' t _ <- typeCheck e1
     -- TypedExpression e2' t _ <- typeCheck e2
     -- return $ TypedExpression (AssignmentExpression False e1' (I32DoubleOperatorExpression op e1' e2')) unitType staticLifetime
@@ -514,6 +494,9 @@ ifExpression p condition onTrue onFalse = do
         borrowsMut = borrowsMut onTrueValue ++ borrowsMut onFalseValue,
         owned = False
     }
+    putPosition p
+    traverse_ borrow (borrows value)
+    traverse_ borrowMut (borrowsMut value)
     et <- createValueExpression value
     return $ TypedExpression (IfExpression condition' onTrue' onFalse') et
 
@@ -553,5 +536,5 @@ typeCheckInPlaceContext mutable e = withinContext $ do
     putContext $ PlaceContext mutable
     putPosition (hasPosition e)
     TypedExpression e' et <- typeCheck e
-    let PlaceType v = et
+    let PlaceType _ v = et
     return (e', v)

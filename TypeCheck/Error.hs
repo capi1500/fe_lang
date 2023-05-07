@@ -30,7 +30,7 @@ data PreprocessorError =
     CannotMakeEmptyReference BNFC'Position |
     CannotTakeMutableReferenceToConstant BNFC'Position VariableId |
     CannotDerefNotReference BNFC'Position Type |
-    CannotDerefReferenceToMultipleVariables BNFC'Position VariableId |
+    CannotDerefReferenceToMultipleVariables BNFC'Position |
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |
     Fatal String

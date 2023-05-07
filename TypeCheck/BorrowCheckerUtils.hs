@@ -86,8 +86,7 @@ moveOutOrCopyById variableId = do
 
 moveOutOrCopy :: Variable -> PreprocessorMonad ()
 moveOutOrCopy variable = do
-    canMove <- canMove variable
-    if not canMove then do return ()
+    if isCopy (variableType variable) then do return ()
     else do moveOut variable
 
 moveOutById :: VariableId -> PreprocessorMonad ()
@@ -97,58 +96,50 @@ moveOutById variableId = do
 
 moveOut :: Variable -> PreprocessorMonad ()
 moveOut variable = do
-    addWarning $ Debug ("Moving out " ++ show (variableId variable) ++ " " ++ show (variableName variable))
-    let value = variableValue variable
-    when (owned value) $ dropValue value
-    setVariableById (variableId variable) (setVariableState Moved variable) 
-
-canMoveById :: VariableId -> PreprocessorMonad Bool
-canMoveById variableId = do
-    variable <- getVariableById variableId
-    canMove variable
-
-canMove :: Variable -> PreprocessorMonad Bool
-canMove variable = do
+    p <- gets position
+    addWarning $ Debug ("Moving out " ++ show (variableId variable) ++ " " ++ show (variableName variable) ++ " at " ++ show p)
     let state = variableState variable
     if state == Moved then do
-        return False
+        return ()
     else if state == Uninitialized then do
         addWarning $ VariableNotInitializedNotUsed (variableId variable)
-        return False
-    else do
+    else  do
         unless (state == Free) $ throw (CannotMoveOut variable)
-        let t = variableType variable
-        return $ not (isCopy t)
+        let value = variableValue variable
+        when (owned value) $ dropValue value
+        setVariableById (variableId variable) (setVariableState Moved variable) 
 
-makeImplicitBorrowValue :: VariableId -> Mutable -> PreprocessorMonad (Value, VariableId)
-makeImplicitBorrowValue id mutability = do
+makeBorrow :: VariableId -> Mutable -> PreprocessorMonad Value
+makeBorrow id mut = do
     p <- gets position
-    variable <- getVariableById id
-    value <- makeValue mutability (variableType variable) p
-    tempId <- addTemporaryVariable mutability value
-    addWarning $ Debug ("implicit borrow of " ++ show id ++ " as " ++ show tempId)
-    return (value, tempId)
+    var <- getVariableById id
+    doBorrow p mut (variableType var)
   where
-    makeValue Const t p = do
-        let value = Value {
+    doBorrow p Const t = do
+        borrow id
+        return Value {
             valueCreatedAt = p,
             valueType = TReference Const t,
             borrows = [id],
             borrowsMut = [],
             owned = True
         }
-        borrow id
-        return value
-    makeValue Mutable t p = do
-        let value = Value {
+    doBorrow p Mutable t = do
+        borrowMut id
+        return Value {
             valueCreatedAt = p,
             valueType = TReference Mutable t,
             borrows = [],
             borrowsMut = [id],
             owned = True
         }
-        borrowMut id
-        return value
+
+
+makeImplicitBorrowValue :: VariableId -> Mutable -> PreprocessorMonad Value
+makeImplicitBorrowValue id mutability = do
+    value <- makeBorrow id mutability
+    addWarning $ Debug ("implicit borrow of " ++ show id)
+    return (setValueOwned False value)
 
 dropValue :: Value -> PreprocessorMonad ()
 dropValue value = do

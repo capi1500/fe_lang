@@ -4,5 +4,5 @@ fn main() {
     var z: &i32;
     z = y;
     z = &x;
-    z = y;
+//    z = y; // invalid use after move
 }

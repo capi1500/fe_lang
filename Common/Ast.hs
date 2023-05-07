@@ -36,7 +36,7 @@ data Expression =
     -- MatchExpression Expression [MatchArm]
     LiteralExpression Value |
     MakeArrayExpression [Value] |
-    VariableExpression Identifier | -- variableId is valid for current frame
+    VariableExpression Identifier | -- ident, isRef
     ReferenceExpression Identifier |
     DereferenceExpression Expression |
     -- StructExpression Ident [StructExpressionField]
@@ -56,7 +56,7 @@ data Expression =
     -- LazyAndExpression Expression Expression |
     -- LazyOrExpression Expression Expression |
     -- RangeExpression Expression Expression |
-    AssignmentExpression Bool Expression Expression -- isRef, expression1, expression2 (TODO: maybe isRef should be stored in variable in exec)
+    AssignmentExpression Expression Expression -- expression1, expression2
     -- BreakExpression |
     -- ContinueExpression |
     -- ReturnExpressionUnit |
@@ -92,7 +92,7 @@ data Value =
     VStruct (Map Identifier Pointer) |
     VVariant Int Pointer | -- value_tag, value
     VFunction [Pointer] Expression | -- captures, code
-    VArray Int [Pointer] | -- size, values
+    VArray [Pointer] | -- values
     VReference Pointer
   deriving (Eq, Ord, Show, Read)
 

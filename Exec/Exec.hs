@@ -63,7 +63,7 @@ instance Executable Initialization Variable where
     execute VarUninitialized = do
         return Uninitialized
     execute (VarInitialized expression) = do
-        expression' <- execute expression >>= deref
+        expression' <- execute expression
         return $ Variable expression'
 
 instance Executable Expression Value where
@@ -81,7 +81,7 @@ instance Executable Expression Value where
             return VUnit
     execute (MakeArrayExpression values) = do
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
-        return $ VArray (length values) pointers
+        return $ VArray pointers
     execute (VariableExpression ident) = do
         (_, Variable value) <- getVariable ident
         return value
@@ -110,19 +110,19 @@ instance Executable Expression Value where
         v1 <- execute e1
         v2 <- execute e2
         doBooleanDoubleOperator operator v1 v2
-    execute (AssignmentExpression isRef e1 e2) = do
-        VReference v1 <- execute e1
-        v2 <- execute e2
-        setVariableById v1 v2
-        return $ VReference v1
+    execute (AssignmentExpression e1 e2) = do
+        VReference ptr <- execute e1
+        v <- execute e2
+        setVariableById ptr v
+        return $ VReference ptr
     execute (UnaryMinusExpression e) = do
         VI32 v <- execute e
         return $ VI32 (-v)
     execute (UnaryNegationExpression e) = do
         VBool v <- execute e
         return $ VBool (not v)
-    execute x = do
-        throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
+    -- execute x = do
+    --     throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
 
 doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doBooleanDoubleOperator Equals v1 v2 = do

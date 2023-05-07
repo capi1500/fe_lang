@@ -1,5 +1,7 @@
 fn main() {
-	var x = 5;
-	const y = &x;
-	const z = &x;
+    var x = 5;
+    const y = &x;
+    const y1 = &x;
+    const z = y;
+    const t = x;
 }

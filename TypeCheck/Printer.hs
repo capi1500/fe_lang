@@ -23,7 +23,7 @@ printVariables = do
         ++ "]")
 
 instance CodePrint ExpressionType where
-    codePrint tabs (PlaceType id) = "Pointer " ++ show id
+    codePrint tabs (PlaceType mut id) = show mut ++ " pointer " ++ show id
     codePrint tabs (ValueType value) = codePrint tabs value
 
 instance CodePrint TypedExpression where

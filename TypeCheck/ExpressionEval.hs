@@ -22,14 +22,19 @@ createPlaceExpression :: VariableId -> PreprocessorMonad ExpressionType
 createPlaceExpression variableId = gets context >>= internalCreatePlaceExpression variableId
 
 internalCreatePlaceExpression :: VariableId -> ExpressionContext -> PreprocessorMonad ExpressionType
-internalCreatePlaceExpression variableId (PlaceContext _) = do
-    return $ PlaceType variableId
+internalCreatePlaceExpression variableId (PlaceContext Mutable) = do
+    p <- gets position
+    variable <- getVariableById variableId
+    when (variableMutability variable == Const) $ throw (CannotTakeMutableReferenceToConstant p variableId)
+    unless (variableState variable == Free || variableState variable == Uninitialized) $ throw (AlreadyBorrowed p variableId)
+    return $ PlaceType Mutable variableId
+internalCreatePlaceExpression variableId (PlaceContext Const) = do
+    return $ PlaceType Const variableId
 internalCreatePlaceExpression variableId ValueContext = do
     variable <- getVariableById variableId
     let value = setValueOwned False (variableValue variable)
     
-    shouldMove <- canMoveById variableId
-    when shouldMove $ mutateVariableById variableId (mutateVariableValue (const value))
+    unless (isCopy (variableType variable)) $ mutateVariableById variableId (mutateVariableValue (setValueOwned False))
     moveOutOrCopyById variableId
     return $ ValueType value
 
@@ -37,9 +42,9 @@ createValueExpression :: Value -> PreprocessorMonad ExpressionType
 createValueExpression value = gets context >>= internalCreateValueExpression value
 
 internalCreateValueExpression :: Value -> ExpressionContext -> PreprocessorMonad ExpressionType
-internalCreateValueExpression value (PlaceContext _) = do
-    tempId <- addTemporaryVariable Mutable value
+internalCreateValueExpression value (PlaceContext mutability) = do
+    tempId <- addTemporaryVariable mutability value
     markVariableAsToDrop tempId
-    return $ PlaceType tempId
+    return $ PlaceType mutability tempId
 internalCreateValueExpression value ValueContext = do
     return $ ValueType value

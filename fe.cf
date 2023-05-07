@@ -34,8 +34,9 @@ UnInitialized. Initialization ::= ;
 Typed. TypeDeclaration ::= ":" Type ;
 Untyped. TypeDeclaration ::= ;
 
-TypeSimple. Type ::= TypeModifier Ident ;
-TypeArray. Type ::= TypeModifier ArrayType ;
+TypeSimple. Type ::= Ident ;
+TypeArray. Type ::= ArrayType ;
+TypeModified. Type ::= TypeModifier Type ;
 TypeFunction. Type ::= FunctionKind Lifetime "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
 
 None. TypeModifier ::= "" ; 
@@ -87,7 +88,7 @@ CallParam. CallParam ::= Expression1 ;
 separator CallParam "," ;
 IndexExpression. Expression14 ::= Expression14 "[" Expression1 "]" ;
 
-UnaryExpression. Expression13 ::= UnaryOperator Expression14 ;
+UnaryExpression. Expression13 ::= UnaryOperator Expression13 ;
 TypeCastExpression. Expression12 ::= Expression13 "as" Type ;
 MultiplyExpression. Expression11 ::= Expression11 "*" Expression12 ;
 DivideExpression. Expression11 ::= Expression11 "/" Expression12 ;
