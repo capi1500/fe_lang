@@ -15,7 +15,7 @@ import Control.Monad.State
 import qualified Fe.Abs as A
 import Fe.Abs (HasPosition(hasPosition))
 
-import Common.Ast hiding (Value)
+import Common.Ast hiding (Variable, Value)
 import Common.Utils
 import Common.Types
 import Common.Scope
@@ -376,8 +376,13 @@ makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     v1 <- makeImplicitBorrowValue id1 Const
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
+
     printVariables
     assertType p (valueType v1) (valueType v2)
+
+    let TReference _ innerT = valueType v1
+    when (isFunction innerT) $ throw (CannotComapreFunctions innerT)
+
     expressionType <- createValueExpression (makeValue p boolType False)
     dropValue v1
     dropValue v2

@@ -35,7 +35,7 @@ instance CodePrint Expression where
         else
             "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
     codePrint tabs (AssignmentExpression e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
-    codePrint tabs expr = show expr
+    codePrint tabs expr = "<internal>"
 
 instance CodePrint Value where
     codePrint _ (VI32 i) = show i

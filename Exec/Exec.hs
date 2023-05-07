@@ -18,6 +18,7 @@ import Data.Foldable (traverse_)
 import Exec.StateFunctions
 import Common.Printer
 import Common.AstPrinter
+import Common.InternalFunctions
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -25,11 +26,12 @@ class Executable a b where
 instance Executable Code () where
     execute :: Code -> ExecutorMonad ()
     execute (Code statements) = do
+        traverse_ (\(name, _, e) -> addVariable name (Variable $ VFunction [] e)) internals
         traverse_ initializeGlobalScope statements
-        ExecutionState _ mainId <- get
+        ExecutionState _ mainId _ <- get
         (_, Variable (VFunction _ code)) <- getVariable mainFunction
         x <- execute code :: ExecutorMonad Value
-        liftIO $ print x
+        liftIO (putStrLn $ codePrint 0 x)
         return ()
 
 initializeGlobalScope :: Statement -> ExecutorMonad ()
@@ -121,6 +123,8 @@ instance Executable Expression Value where
     execute (UnaryNegationExpression e) = do
         VBool v <- execute e
         return $ VBool (not v)
+    execute (InternalExpression f) = do
+        f
     -- execute x = do
     --     throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
 
@@ -128,7 +132,8 @@ doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMo
 doBooleanDoubleOperator Equals v1 v2 = do
     v1' <- deref v1
     v2' <- deref v2
-    return $ VBool (v1' == v2')
+    x <- equals v1' v2'
+    return $ VBool x
 doBooleanDoubleOperator Greater v1 v2 = do
     VI32 v1' <- deref v1
     VI32 v2' <- deref v2
@@ -142,7 +147,33 @@ doBooleanDoubleOperator LazyAnd (VBool v1) (VBool v2) = do
 doBooleanDoubleOperator LazyOr (VBool v1) (VBool v2) = do
     return $ VBool (v1 || v2)
 doBooleanDoubleOperator op v1 v2 = do
-    throwError $ TypeCheckerFailed (show v1 ++ " " ++ show op ++ " " ++ show v2)
+    throwError $ TypeCheckerFailed (codePrint 0 v1 ++ " " ++ show op ++ " " ++ codePrint 0 v2)
+
+equals :: Value -> Value -> ExecutorMonad Bool
+equals (VI32 a) (VI32 b) = do return $ a == b
+equals (VChar a) (VChar b) = do return $  a == b
+equals (VBool a) (VBool b) = do return $  a == b
+equals VUnit VUnit = do return True
+equals (VStruct a) (VStruct b) = do
+    throwError $ Other "Not yet implemented: cmp of structs"
+equals (VVariant tag1 a) (VVariant tag2 b) = do
+    throwError $ Other "Not yet implemented: cmp of variants"
+equals (VFunction _ _) (VFunction _ _) = do
+    throwError $ TypeCheckerFailed "Cannot compare function values directly"
+equals (VArray a) (VArray b) = do
+    if length a /= length b then do
+        return False
+    else do
+        out <- traverse (uncurry equals) (zip (fmap VReference a) (fmap VReference b))
+        return $ and out
+equals (VReference a) (VReference b) = do
+    if a == b then do
+        return True
+    else do
+        Variable a' <- getVariableById a
+        Variable b' <- getVariableById b
+        equals a' b'
+equals _ _ = do return False
 
 doNumericDoubleOperator :: NumericDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doNumericDoubleOperator Plus (VI32 v1) (VI32 v2) = do
@@ -170,4 +201,4 @@ doNumericDoubleOperator BitXor (VI32 v1) (VI32 v2) = do
 doNumericDoubleOperator BitAnd (VI32 v1) (VI32 v2) = do
     return $ VI32 (v1 .&. v2)
 doNumericDoubleOperator op v1 v2 = do
-    throwError $ TypeCheckerFailed (show v1 ++ " " ++ show op ++ " " ++ show v2)
+    throwError $ TypeCheckerFailed (codePrint 0 v1 ++ " " ++ show op ++ " " ++ codePrint 0 v2)

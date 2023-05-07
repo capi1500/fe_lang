@@ -33,6 +33,7 @@ data PreprocessorError =
     CannotDerefReferenceToMultipleVariables BNFC'Position |
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |
+    CannotComapreFunctions Type |
     Fatal String
   deriving (Eq, Ord, Show, Read)
 

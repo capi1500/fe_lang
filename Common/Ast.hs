@@ -4,18 +4,33 @@ module Common.Ast where
 
 import Data.Map (Map)
 import Data.List (intercalate)
+import Control.Monad.State
+import Control.Monad.Except
 
 import Common.Types
 import Common.Utils
 import Common.Printer
+import Common.Scope
+
+import Exec.Error
 
 mainFunction :: Identifier
 mainFunction =  "main"
 
+data Variable = Variable Value | Uninitialized
+
+type VariableMappings = Scope (Map Identifier Pointer)
+data ExecutionState = ExecutionState {
+    variableMappings :: VariableMappings,
+    variables :: [Variable],
+    input :: String
+}
+
+type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
+
 type Pointer = Int
 
 newtype Code = Code [Statement]
-  deriving (Eq, Ord, Show, Read)
 
 data Statement =
     EmptyStatement |
@@ -23,10 +38,8 @@ data Statement =
     NewVariableStatement Identifier Initialization | -- ident, is_reference, init
     NewFunctionStatement Identifier Expression [Identifier] |
     ExpressionStatement Expression
-  deriving (Eq, Ord, Show, Read)
 
 data Initialization = VarInitialized Expression | VarUninitialized
-  deriving (Eq, Ord, Show, Read)
 
 data Expression =
     BlockExpression [Statement] |
@@ -34,6 +47,7 @@ data Expression =
     -- WhileExpression Expression Expression |
     -- ForExpression Pattern Expression Expression |
     -- MatchExpression Expression [MatchArm]
+    InternalExpression (ExecutorMonad Value) |
     LiteralExpression Value |
     MakeArrayExpression [Value] |
     VariableExpression Identifier | -- ident, isRef
@@ -61,7 +75,6 @@ data Expression =
     -- ContinueExpression |
     -- ReturnExpressionUnit |
     -- ReturnExpressionValue Expression
-  deriving (Eq, Ord, Show, Read)
 
 data NumericDoubleOperator =
     Plus |
@@ -94,7 +107,6 @@ data Value =
     VFunction [Pointer] Expression | -- captures, code
     VArray [Pointer] | -- values
     VReference Pointer
-  deriving (Eq, Ord, Show, Read)
 
 isString :: [Value] -> Bool
 isString = all isChar

@@ -1,39 +1,21 @@
 module Exec.State where
 
-import Data.Array
-import Control.Monad.State
-import Control.Monad.Except
-
-import Exec.Error
-
-import Common.Types
-import Common.Utils
-import Common.Ast
-import Common.Scope
 import Data.Map
 
-type VariableId = Int
+import Control.Monad.State
 
-data Variable = Variable Value | Uninitialized
-  deriving (Eq, Ord, Show, Read)
+import Common.Scope
+import Common.Ast
 
-type VariableMappings = Scope (Map Identifier VariableId)
-data ExecutionState = ExecutionState {
-    variableMappings :: VariableMappings,
-    variables :: [Variable]
-} deriving (Eq, Ord, Show, Read)
-
-type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
-
-makeExecutionState :: ExecutionState
-makeExecutionState  = ExecutionState (Global empty) []
+makeExecutionState :: String -> ExecutionState
+makeExecutionState = ExecutionState (Global empty) []
 
 putMappings :: VariableMappings -> ExecutorMonad ()
 putMappings mappings = do
-    ExecutionState _ variables <- get
-    put $ ExecutionState mappings variables
+    ExecutionState _ variables input <- get
+    put $ ExecutionState mappings variables input
 
 putVariables :: [Variable] -> ExecutorMonad ()
 putVariables variables = do
-    ExecutionState mappings _ <- get
-    put $ ExecutionState mappings variables
+    ExecutionState mappings _ input <- get
+    put $ ExecutionState mappings variables input

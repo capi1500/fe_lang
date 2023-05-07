@@ -16,6 +16,7 @@ import TypeCheck.Error
 import TypeCheck.Variable
 import Data.List (intercalate)
 import Common.Ast (Expression)
+import Common.InternalFunctions
 
 
 type TypeDefinitions = Scope (Map Identifier Type)
@@ -42,7 +43,6 @@ data PreprocessorState = PreprocessorState {
 } deriving (Eq, Ord, Show, Read)
 
 data TypedExpression = TypedExpression Expression ExpressionType -- expression, type of expression
-  deriving (Eq, Ord, Show, Read)
 
 type PreprocessorMonad a = ExceptT PreprocessorError (State PreprocessorState) a
 
@@ -56,13 +56,38 @@ makePreprocessorState = PreprocessorState {
             ("()", TPrimitive Unit),
             ("String", TArray charType)]
     ),
-    variables = Variables (Global empty) [],
+    variables = fromInternals internals,
     lifetimeState = LifetimeState staticLifetime 1,
     warnings = [],
     context = ValueContext,
     toDropAtStatementEnd = [],
     position = Nothing
 }
+
+makeInternal :: VariableId -> Identifier -> Type -> Variable
+makeInternal id name t = Variable {
+    variableCreatedAt = Nothing,
+    variableName = Just name,
+    variableType = t,
+    variableId = id,
+    variableMutability = Const,
+    variableState = Free,
+    variableValue = Value {
+        valueCreatedAt = Nothing,
+        valueType = t,
+        borrows = [],
+        borrowsMut = [],
+        owned = True
+    },
+    lifetime = staticLifetime
+}
+
+fromInternals :: [(Identifier, Type, Expression)] -> Variables
+fromInternals names = 
+    let zipped = zip names [0..(length names)] in
+    Variables
+        (Global $ fromList (fmap (\((name, t, _), id) -> (name, id)) zipped))
+        (fmap (\((name, t, _), id) -> makeInternal id name t) zipped)
 
 staticLifetime = Lifetime [0] 1
 

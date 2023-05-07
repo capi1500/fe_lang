@@ -12,9 +12,9 @@ import Common.Ast
 
 addVariable :: Identifier -> Variable -> ExecutorMonad Pointer
 addVariable ident variable = do
-    ExecutionState mappings variables <- get
+    ExecutionState mappings variables input <- get
     let id = length variables
-    put $ ExecutionState (helper mappings id) (listPushBack variable variables)
+    put $ ExecutionState (helper mappings id) (listPushBack variable variables) input
     return id
   where
     helper (Global map) id = Global $ insert ident id map
@@ -22,18 +22,18 @@ addVariable ident variable = do
 
 addTmpVariable :: Variable -> ExecutorMonad Pointer
 addTmpVariable variable = do
-    ExecutionState mappings variables <- get
+    ExecutionState mappings variables input <- get
     let id = length variables
-    put $ ExecutionState mappings (listPushBack variable variables)
+    put $ ExecutionState mappings (listPushBack variable variables) input
     return id
 
 getVariable :: Identifier -> ExecutorMonad (Pointer, Variable)
 getVariable ident = do
-    ExecutionState mappings variables <- get
+    ExecutionState mappings variables _ <- get
     let id = helper mappings ident
     return (id, listGet id variables)
   where
-    helper :: VariableMappings -> Identifier -> VariableId
+    helper :: VariableMappings -> Identifier -> Pointer
     helper (Global map) ident = fromJust (lookup ident map)
     helper (Local parent map) ident =
         let maybeId = lookup ident map in
@@ -51,9 +51,9 @@ setVariableById id value = do
 
 removeVariable :: Identifier -> ExecutorMonad ()
 removeVariable ident = do
-    ExecutionState mappings variables <- get
+    ExecutionState mappings variables input <- get
     let id = length variables
-    put $ ExecutionState (helper mappings id) variables
+    put $ ExecutionState (helper mappings id) variables input
   where
     helper (Global map) id = Global $ insert ident id map
     helper (Local parent map) id = Local parent (insert ident id map)
