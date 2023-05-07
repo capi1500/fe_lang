@@ -1,19 +1,20 @@
 module TypeCheck.Variable where
 
-import Data.Set (Set)
-
 import Common.Utils
 import Common.Types
 import Common.Printer
-import Fe.Abs (Ident(..), BNFC'Position)
+
 import Data.Maybe
+import Data.Set
+
+import Fe.Abs (Ident(..), BNFC'Position)
 
 type VariableId = Int
 
 data VariableState =
     Uninitialized |
-    Borrowed (Set VariableId) |
-    BorrowedMut VariableId |
+    Borrowed Int (Set BNFC'Position) |
+    BorrowedMut BNFC'Position |
     Moved |
     Free
   deriving (Eq, Ord, Show, Read)
@@ -25,51 +26,34 @@ data Lifetime = Lifetime [Int] Int -- lifetime predecessors ids list, (where beg
   deriving (Eq, Ord, Show, Read)
 
 data Value = Value {
+    valueCreatedAt :: BNFC'Position,
     valueType :: Type,
     borrows :: [VariableId],
     borrowsMut :: [VariableId],
-    lifetime :: Lifetime
+    owned :: Bool
 } deriving (Eq, Ord, Show, Read)
 
-makeValue :: Type -> Lifetime -> Value
-makeValue t = Value t [] []
+makeValue :: BNFC'Position -> Type -> Bool -> Value
+makeValue p t = Value p t [] []
 
 data Variable = Variable {
-    createdAt :: BNFC'Position,
+    variableCreatedAt :: BNFC'Position,
     variableName :: Maybe Identifier,
     variableType :: Type,
     variableId :: VariableId,
     variableMutability :: Mutable,
     variableState :: VariableState,
-    variableValue :: Value
+    variableValue :: Value,
+    lifetime :: Lifetime
 } deriving (Eq, Ord, Show, Read)
 
 isBorrowed :: VariableState -> Bool
-isBorrowed (Borrowed _) = True
+isBorrowed (Borrowed _ _) = True
 isBorrowed _ = False
 
-instance CodePrint Value where
-    codePrint tabs (Value t borrows borrowsMut lifetime) = 
-        let Lifetime list _ = lifetime in
-        "Value {\n" ++ 
-        printTabs (tabs + 1) ++ "borrows" ++ codePrint tabs borrows ++ "\n" ++
-        printTabs (tabs + 1) ++ "borrowsMut: " ++ codePrint tabs borrowsMut ++ "\n" ++
-        printTabs (tabs + 1) ++ "lifetime: " ++ codePrint tabs list ++ "\n" ++
-        printTabs tabs ++ "}"
-
-instance CodePrint Variable where
-    codePrint tabs (Variable createdAt maybeIdent t id mutability state value) =
-        let name = fromMaybe "temporary" maybeIdent in
-        "Variable " ++ show id ++ " {\n" ++
-        printTabs (tabs + 1) ++ show name ++ ": " ++ (if isConst mutability then "const " else "") ++ codePrint tabs t ++ "\n" ++
-        printTabs (tabs + 1) ++ "Value: " ++ codePrint (tabs + 1) value ++
-        printTabs (tabs + 1) ++ show state ++ "\n" ++
-        printTabs (tabs + 1) ++ "Created at: " ++ show createdAt ++ "\n" ++
-        printTabs tabs ++ "}"
-
--- setVariableState :: VariableState -> Variable -> Variable
--- setVariableState variableState (Variable createdAt variableIdentifier id variableType const _ borrows borrowsMut lifetime) =
---     Variable createdAt variableIdentifier id variableType const variableState borrows borrowsMut lifetime
+setVariableState :: VariableState -> Variable -> Variable
+setVariableState variableState (Variable createdAt variableIdentifier id variableType const _ value lifetime) =
+    Variable createdAt variableIdentifier id variableType const variableState value lifetime
 
 -- setVariableBorrows :: [VariableId] -> Variable -> Variable
 -- setVariableBorrows borrows (Variable createdAt variableIdentifier id variableType const variableState _ borrowsMut lifetime) =
@@ -87,9 +71,14 @@ instance CodePrint Variable where
 -- setVariableLifetime lifetime (Variable createdAt variableIdentifier id variableType const variableState borrows borrowsMut _) =
 --     Variable createdAt variableIdentifier id variableType const variableState borrows borrowsMut lifetime
 
-getVariablesValueLifetime :: Variable -> Lifetime
-getVariablesValueLifetime variable = lifetime (variableValue variable)
+mutateVariableValue :: (Value -> Value) -> Variable -> Variable
+mutateVariableValue mutate (Variable createdAt variableIdentifier variableType id const variableState value lifetime) = 
+    Variable createdAt variableIdentifier variableType id const variableState (mutate value) lifetime
 
 setVariableId :: VariableId -> Variable -> Variable
-setVariableId id (Variable createdAt variableIdentifier variableType _ const variableState value) =
-    Variable createdAt variableIdentifier variableType id const variableState value
+setVariableId id (Variable createdAt variableIdentifier variableType _ const variableState value lifetime) =
+    Variable createdAt variableIdentifier variableType id const variableState value lifetime
+
+setValueOwned :: Bool -> Value -> Value
+setValueOwned owned (Value createdAt t borrows borrowsMut _) = 
+    Value createdAt t borrows borrowsMut owned

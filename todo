@@ -1,6 +1,3 @@
-- zmienić na place/asignee/value expression
-
-
 - Jeśli zwrócona może być jedna z wielu wartości, zwrócony lifetime powinien być najkrótszy, a function kind z preferencją do FnOnce
 - While i for expression mogą być typecheckowane dwa razy, żeby ogarnąć, czy jakaś funkcja/inna zmienna nie jest moved w środku
 
@@ -12,6 +9,7 @@
 	Typy mają annotated lifetime
 
 Skrócić czas życia zmiennych z od deklaracji do końca bloku, na od deklaracji do ostatniego użycia:
+- skorzystać z https://doc.rust-lang.org/reference/destructors.html
 - przed type checkiem, przejście po całym kodzie i zapisanie, gdzie zmienne:
 	- są moved out
 	- pierwsze miejsce od ostatniego wykorzystania zmiennej, gdzie zmienna nie ma już żadnych referencji ani mutowalnych referencji

@@ -14,7 +14,7 @@ import Common.Utils
 import Common.Scope
 import Common.Printer
 
-import Fe.Abs (Ident)
+import Fe.Abs (Ident, BNFC'Position)
 
 import TypeCheck.State
 import TypeCheck.Error
@@ -22,8 +22,8 @@ import TypeCheck.Variable
 import TypeCheck.VariablesUtils
 import TypeCheck.LifetimeUtils
 
-assertType :: Type -> Type -> A.BNFC'Position -> PreprocessorMonad ()
-assertType actualType expectedType p = do
+assertType :: BNFC'Position -> Type -> Type -> PreprocessorMonad ()
+assertType p actualType expectedType = do
     when (expectedType /= actualType) $
         throw $ TypeMismatch p actualType expectedType
 
@@ -42,26 +42,6 @@ isUnInitialized (A.UnInitialized _) = True
 isInitialized :: A.Initialization -> Bool
 isInitialized (A.Initialized _ _) = True
 isInitialized (A.UnInitialized _) = False
-
--- isPlaceExpression :: ExpressionType -> Bool
--- isPlaceExpression (PlaceType _) = True
--- isPlaceExpression _ = False
-
--- isMutablePlaceExpression :: ExpressionContext -> Bool
--- isMutablePlaceExpression (PlaceContext Mutable) = True
--- isMutablePlaceExpression _ = False
-
--- isImmutablePlaceExpression :: ExpressionContext -> Bool
--- isImmutablePlaceExpression (PlaceContext Const) = True
--- isImmutablePlaceExpression _ = False
-
--- isValueExpression :: ExpressionType -> Bool
--- isValueExpression (ValueType _) = True
--- isValueExpression _ = False
-
--- isAssigneeExpression :: ExpressionType -> Bool
--- isAssigneeExpression Assignee = True
--- isAssigneeExpression _ = False
 
 -- TODO: deal with annotated lifetimes
 modifyType :: Type -> A.TypeModifier -> PreprocessorMonad Type
@@ -85,8 +65,8 @@ getShortestLifetime p variables = do
     when (null variables) $ throw (CannotMakeEmptyReference p)
     zipped <- traverse (\id -> do
         variable <- getVariableById id
-        let position = createdAt variable
-        return (getVariablesValueLifetime variable, position)) variables
+        let position = variableCreatedAt variable
+        return (lifetime variable, position)) variables
     let head:tail = zipped
     (l, p) <- foldM helper head tail
     return l

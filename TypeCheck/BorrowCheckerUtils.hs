@@ -11,7 +11,10 @@ import TypeCheck.Variable
 import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.VariablesUtils
-    
+import Text.XHtml (variable)
+import Data.Maybe
+import Common.Printer
+
 -- transferOwnership  :: VariableId -> VariableId -> PreprocessorMonad ()
 -- transferOwnership newOwnerId movedOutId = do
 --     newOwner <- getVariableById newOwnerId
@@ -42,74 +45,67 @@ import TypeCheck.VariablesUtils
 --         mutateVariableById borrowedId (setVariableState (BorrowedMut newOwnerId))
 --         return $ borrowedId:combinedBorrowsList
 
--- borrowVariable :: A.BNFC'Position -> VariableId -> VariableId -> PreprocessorMonad ()
--- borrowVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
---   where
---     markAsBorrowed :: Variable -> PreprocessorMonad Variable
---     markAsBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
---         state' <- if state == Free then do
---             return $ Borrowed (singleton borrowerId)
---         else if state == Uninitialized then do
---             throw $ UninitializedVariableUsed p ident
---         else if isBorrowed state then do
---             let Borrowed whatBorrows = state
---             return $ Borrowed (Data.Set.insert borrowerId whatBorrows)
---         else do
---             throw $ AlreadyBorrowed borrowerId p
---         return $ Variable ident const t state' borrows borrowsMut lifetime
---     addBorrowed :: Variable -> PreprocessorMonad Variable
---     addBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
---         return $ Variable ident const t state (listPushBack borrowedId borrows) borrowsMut lifetime
+borrow :: VariableId -> PreprocessorMonad ()
+borrow borrowedId = borrowInternal borrowedId markAsBorrowed
+  where
+    markAsBorrowed :: Variable -> PreprocessorMonad Variable
+    markAsBorrowed variable = do
+        p <- gets position
+        let state = variableState variable
+        state' <- if state == Free then do
+            return $ Borrowed 1 (singleton p)
+        else if state == Uninitialized then do
+            throw $ UninitializedVariableUsed p (fromJust (variableName variable))
+        else if isBorrowed state then do
+            let Borrowed borrowedCount borrowPositions = state
+            return $ Borrowed (borrowedCount + 1) (insert p borrowPositions)
+        else do
+            throw $ AlreadyBorrowed p borrowedId
+        return $ setVariableState state' variable
 
--- borrowMutVariable :: A.BNFC'Position -> VariableId -> VariableId -> PreprocessorMonad ()
--- borrowMutVariable p borrowerId borrowedId = borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed
---   where
---     markAsBorrowed :: Variable -> PreprocessorMonad Variable
---     markAsBorrowed (Variable ident mutability t state borrows borrowsMut lifetime) = do
---         unless (state == Free || state == Uninitialized) $ throw (AlreadyBorrowed borrowedId p)
---         when (isConst mutability) $ throw (CannotTakeMutableReferenceToConstant p borrowedId)
---         return $ Variable ident mutability t (BorrowedMut borrowerId) borrows borrowsMut lifetime
---     addBorrowed :: Variable -> PreprocessorMonad Variable
---     addBorrowed (Variable ident const t state borrows borrowsMut lifetime) = do
---         return $ Variable ident const t state borrows (listPushBack borrowedId borrowsMut) lifetime
+borrowMut :: VariableId -> PreprocessorMonad ()
+borrowMut borrowedId = borrowInternal borrowedId markAsBorrowed
+  where
+    markAsBorrowed :: Variable -> PreprocessorMonad Variable
+    markAsBorrowed variable = do
+        p <- gets position
+        let state = variableState variable
+        unless (state == Free || state == Uninitialized) $ throw (AlreadyBorrowed p borrowedId)
+        when (isConst (variableMutability variable)) $ throw (CannotTakeMutableReferenceToConstant p borrowedId)
+        return $ setVariableState (BorrowedMut p) variable
 
--- borrowInternal :: VariableId -> VariableId -> (Variable -> PreprocessorMonad Variable) -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
--- borrowInternal borrowerId borrowedId markAsBorrowed addBorrowed = do
---     getVariableById borrowerId >>= addBorrowed >>= setVariableById borrowerId
---     getVariableById borrowedId >>= markAsBorrowed >>= setVariableById borrowedId
+borrowInternal :: VariableId -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
+borrowInternal borrowedId markAsBorrowed = do
+    getVariableById borrowedId >>= markAsBorrowed >>= setVariableById borrowedId
 
 
-tryMoveOutById :: VariableId -> PreprocessorMonad ()
-tryMoveOutById variableId = do
+moveOutOrCopyById :: VariableId -> PreprocessorMonad ()
+moveOutOrCopyById variableId = do
     variable <- getVariableById variableId
-    tryMoveOut variableId variable
+    moveOutOrCopy variable
 
-tryMoveOut :: VariableId -> Variable -> PreprocessorMonad ()
-tryMoveOut id variable = do
+moveOutOrCopy :: Variable -> PreprocessorMonad ()
+moveOutOrCopy variable = do
     canMove <- canMove variable
     if not canMove then do return ()
-    else do
-    
-    addWarning $ Debug ("Moving out " ++ show id ++ " " ++ show (variableName variable))
-    traverse_ (removeBorrow id) (borrows variable)
-    traverse_ removeMutBorrow (borrowsMut variable)
-    setVariableById id (setVariableState Moved variable)
-  where
-    removeBorrow :: VariableId -> VariableId -> PreprocessorMonad ()
-    removeBorrow borrowerId borrowedId = do
-        addWarning $ Debug ("    Removing borrow of " ++ show borrowedId)
-        variable <- getVariableById borrowedId
-        let Borrowed whatBorrowed = variableState variable
-        let whatBorrowed' = delete borrowerId whatBorrowed
-        let state' = if null whatBorrowed' then Free
-                else Borrowed whatBorrowed'
-        setVariableById borrowedId (setVariableState state' variable)
-        return ()
-    removeMutBorrow :: VariableId -> PreprocessorMonad ()
-    removeMutBorrow borrowedId = do
-        addWarning $ Debug ("    Removing mutable borrow of " ++ show borrowedId)
-        mutateVariableById borrowedId (setVariableState Free)
-        return ()
+    else do moveOut variable
+
+moveOutById :: VariableId -> PreprocessorMonad ()
+moveOutById variableId = do
+    variable <- getVariableById variableId
+    moveOut variable
+
+moveOut :: Variable -> PreprocessorMonad ()
+moveOut variable = do
+    addWarning $ Debug ("Moving out " ++ show (variableId variable) ++ " " ++ show (variableName variable))
+    let value = variableValue variable
+    when (owned value) $ dropValue value
+    setVariableById (variableId variable) (setVariableState Moved variable) 
+
+canMoveById :: VariableId -> PreprocessorMonad Bool
+canMoveById variableId = do
+    variable <- getVariableById variableId
+    canMove variable
 
 canMove :: Variable -> PreprocessorMonad Bool
 canMove variable = do
@@ -123,3 +119,55 @@ canMove variable = do
         unless (state == Free) $ throw (CannotMoveOut variable)
         let t = variableType variable
         return $ not (isCopy t)
+
+makeImplicitBorrowValue :: VariableId -> Mutable -> PreprocessorMonad (Value, VariableId)
+makeImplicitBorrowValue id mutability = do
+    p <- gets position
+    variable <- getVariableById id
+    value <- makeValue mutability (variableType variable) p
+    tempId <- addTemporaryVariable mutability value
+    addWarning $ Debug ("implicit borrow of " ++ show id ++ " as " ++ show tempId)
+    return (value, tempId)
+  where
+    makeValue Const t p = do
+        let value = Value {
+            valueCreatedAt = p,
+            valueType = TReference Const t,
+            borrows = [id],
+            borrowsMut = [],
+            owned = True
+        }
+        borrow id
+        return value
+    makeValue Mutable t p = do
+        let value = Value {
+            valueCreatedAt = p,
+            valueType = TReference Mutable t,
+            borrows = [],
+            borrowsMut = [id],
+            owned = True
+        }
+        borrowMut id
+        return value
+
+dropValue :: Value -> PreprocessorMonad ()
+dropValue value = do
+    addWarning $ Debug ("Dropping " ++ codePrint 1 value)
+    traverse_ removeBorrow (borrows value)
+    traverse_ removeBorrowMut (borrowsMut value)
+  where
+    removeBorrow :: VariableId -> PreprocessorMonad ()
+    removeBorrow borrowedId = do
+        addWarning $ Debug ("    Removing borrow of " ++ show borrowedId ++ " (at " ++ show (valueCreatedAt value) ++ ")")
+        variable <- getVariableById borrowedId
+        let Borrowed borrowersCount borrowPositions = variableState variable
+        let state' = if borrowersCount == 1 then Free
+                else Borrowed (borrowersCount - 1) (delete (valueCreatedAt value) borrowPositions)
+        addWarning $ Debug ("   New variable state " ++ show state')
+        setVariableById borrowedId (setVariableState state' variable)
+        return ()
+    removeBorrowMut :: VariableId -> PreprocessorMonad ()
+    removeBorrowMut borrowedId = do
+        addWarning $ Debug ("    Removing mutable borrow of " ++ show borrowedId)
+        mutateVariableById borrowedId (setVariableState Free)
+        return ()

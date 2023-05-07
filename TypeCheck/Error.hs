@@ -24,7 +24,7 @@ data PreprocessorError =
     UninitializedVariableUsed BNFC'Position Identifier | -- where, defined
     UseAfterMoved BNFC'Position VariableId |
     AssignmentToConstant BNFC'Position VariableId |
-    AlreadyBorrowed VariableId BNFC'Position |
+    AlreadyBorrowed BNFC'Position VariableId |
     CannotMoveOut Variable |
     LifetimesMismatch BNFC'Position BNFC'Position Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |

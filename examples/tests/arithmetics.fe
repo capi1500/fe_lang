@@ -1,6 +1,6 @@
 fn main() {
 	const x = 3 * 5;
 	const y = x + 2 - 1;
-	const z = 5 / y;
-	const t = x % y;
+	const z = y / 5;
+	const t = y % x;
 }

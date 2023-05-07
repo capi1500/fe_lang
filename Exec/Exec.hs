@@ -16,6 +16,8 @@ import Data.Maybe
 import Control.Monad.State (get)
 import Data.Foldable (traverse_)
 import Exec.StateFunctions
+import Common.Printer
+import Common.AstPrinter
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -52,14 +54,16 @@ instance Executable Statement Value where
         addVariable ident value
         return VUnit
     execute (ExpressionStatement expression) = do
-        execute expression
+        value <- execute expression
+        printLocalScope
+        return value
 
 instance Executable Initialization Variable where
     execute :: Initialization -> ExecutorMonad Variable
     execute VarUninitialized = do
         return Uninitialized
     execute (VarInitialized expression) = do
-        expression' <- execute expression
+        expression' <- execute expression >>= deref
         return $ Variable expression'
 
 instance Executable Expression Value where
@@ -110,22 +114,29 @@ instance Executable Expression Value where
         VReference v1 <- execute e1
         v2 <- execute e2
         setVariableById v1 v2
-        printLocalScope
         return $ VReference v1
-    execute _ = do
-        throwError $ Other "Not yet implemented"
+    execute (UnaryMinusExpression e) = do
+        VI32 v <- execute e
+        return $ VI32 (-v)
+    execute (UnaryNegationExpression e) = do
+        VBool v <- execute e
+        return $ VBool (not v)
+    execute x = do
+        throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
 
 doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doBooleanDoubleOperator Equals v1 v2 = do
-    return $ VBool (v1 == v2)
-doBooleanDoubleOperator Greater (VI32 v1) (VI32 v2) = do
-    return $ VBool (v1 > v2)
-doBooleanDoubleOperator Smaller (VI32 v1) (VI32 v2) = do
-    return $ VBool (v1 < v2)
-doBooleanDoubleOperator GreaterEquals (VI32 v1) (VI32 v2) = do
-    return $ VBool (v1 >= v2)
-doBooleanDoubleOperator SmallerEquals (VI32 v1) (VI32 v2) = do
-    return $ VBool (v1 <= v2)
+    v1' <- deref v1
+    v2' <- deref v2
+    return $ VBool (v1' == v2')
+doBooleanDoubleOperator Greater v1 v2 = do
+    VI32 v1' <- deref v1
+    VI32 v2' <- deref v2
+    return $ VBool (v1' > v2')
+doBooleanDoubleOperator Smaller v1 v2 = do
+    VI32 v1' <- deref v1
+    VI32 v2' <- deref v2
+    return $ VBool (v1' < v2')
 doBooleanDoubleOperator LazyAnd (VBool v1) (VBool v2) = do
     return $ VBool (v1 && v2)
 doBooleanDoubleOperator LazyOr (VBool v1) (VBool v2) = do

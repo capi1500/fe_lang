@@ -5,36 +5,33 @@ import Data.Foldable hiding (null)
 import Data.Set
 import Control.Monad.State
 
+import Fe.Abs (BNFC'Position)
+
 import Common.Types
 
 import TypeCheck.State
 import TypeCheck.Variable
 import TypeCheck.Error
 import TypeCheck.VariablesUtils
-import Fe.Abs (BNFC'Position)
-import TypeCheck.BorrowCheckerUtils
+import TypeCheck.BorrowCheckerUtils    
 
-evalExpressionInValueContext :: ExpressionType -> PreprocessorMonad Value
-evalExpressionInValueContext (PlaceType variableId) = do
-    putContext ValueContext
+-- strong guarantee - value got inside a context (ie. place context) is of a coresponding type (ie. place type)
+    -- value type holds unowned value, if it is not a primitive value, it needs to be droped/transfered on use
+
+createPlaceExpression :: VariableId -> PreprocessorMonad ExpressionType
+createPlaceExpression variableId = gets context >>= internalCreatePlaceExpression variableId
+
+internalCreatePlaceExpression :: VariableId -> ExpressionContext -> PreprocessorMonad ExpressionType
+internalCreatePlaceExpression variableId (PlaceContext _) = do
+    return $ PlaceType variableId
+internalCreatePlaceExpression variableId ValueContext = do
     variable <- getVariableById variableId
-    handlePlaceExpression variableId
-    return (variableValue variable)
-evalExpressionInValueContext (ValueType v) = return v
-evalExpressionInValueContext AssigneeType = 
-    throw $ Other "Not yet implented" Nothing
-
-handlePlaceExpression :: VariableId -> PreprocessorMonad ()
-handlePlaceExpression variableId = do
-    variable <- getVariableById variableId
-    gets context >>= internalHandlePlaceExpression variableId variable
-
-
-internalHandlePlaceExpression :: VariableId -> Variable -> ExpressionContext -> PreprocessorMonad ()
-internalHandlePlaceExpression id variable (PlaceContext _) = do
-    throw $ Other "Not yet implented" Nothing
-internalHandlePlaceExpression id variable ValueContext = do
-    tryMoveOut id variable
+    let value = setValueOwned False (variableValue variable)
+    
+    shouldMove <- canMoveById variableId
+    when shouldMove $ mutateVariableById variableId (mutateVariableValue (const value))
+    moveOutOrCopyById variableId
+    return $ ValueType value
 
 createValueExpression :: Value -> PreprocessorMonad ExpressionType
 createValueExpression value = gets context >>= internalCreateValueExpression value

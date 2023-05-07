@@ -27,8 +27,9 @@ isSubLifetime :: Lifetime -> Lifetime -> Bool
 isSubLifetime (Lifetime first _) (Lifetime second _) = first `isPrefixOf` second
 
 -- updates lifetime state, but keeps current lifetime saved value
-forkLifetime :: BNFC'Position -> Lifetime -> PreprocessorMonad Lifetime
-forkLifetime p (Lifetime list _) = do
+forkLifetime :: Lifetime -> PreprocessorMonad Lifetime
+forkLifetime (Lifetime list _) = do
+    p <- gets position
     let line = if isJust p then
             let (l, _) = fromJust p in l
         else
@@ -39,8 +40,8 @@ forkLifetime p (Lifetime list _) = do
     return lifetime'
 
 -- updates lifetime state and changes saved lifetime
-updateLifetime :: BNFC'Position -> PreprocessorMonad ()
-updateLifetime p = do
+updateLifetime :: PreprocessorMonad ()
+updateLifetime = do
     lifetime <- getLifetime
-    lifetime' <- forkLifetime p lifetime
+    lifetime' <- forkLifetime lifetime
     saveLifetime lifetime'

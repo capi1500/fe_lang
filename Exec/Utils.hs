@@ -7,6 +7,9 @@ import Common.Scope
 import Control.Monad.State
 import Data.Map (toList)
 import Fe.Abs (Ident(..))
+import Common.Printer
+import Common.AstPrinter
+import Data.List (intercalate, sortBy)
 
 valueOfBlock :: [Value] -> Value
 valueOfBlock statements =
@@ -39,13 +42,20 @@ deref x = do
 --         deref value
 --     return $ Variable v'
 
+instance CodePrint Variable where
+    codePrint tabs Uninitialized = "null"
+    codePrint tabs (Variable v) = codePrint tabs v
+
 printLocalScope :: ExecutorMonad ()
 printLocalScope = do
     mappings <- gets variableMappings
     vars <- traverse (\(ident, id) -> do
         x <- getVariableById id
-        return (ident, id, x)) (toList (helper mappings))
-    liftIO $ print vars
+        return $ "    " ++ show id ++ ": " ++ ident ++ " = " ++ codePrint 1 x ++ "\n")
+        (sortBy (\(_, id1) (_, id2) -> compare id1 id2) (toList (helper mappings)))
+
+    let string = "Local scope: [\n" ++ intercalate "" vars ++ "]" 
+    liftIO $ putStrLn string
   where
     helper (Global map) = map
     helper (Local _ map) = map

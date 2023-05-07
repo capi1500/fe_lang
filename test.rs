@@ -126,6 +126,16 @@ error[E0507]: cannot move out of `*c` which is behind a mutable reference
     |                 help: consider borrowing here: `&*c`
    */
 
+fn o() {
+	let a: &i32;
+	let z: &&i32 = {
+		let n = 5;
+		a = &n;
+		&a
+	};
+	println!("{}", **z)
+}
+
 fn main() {
 	n();
 }

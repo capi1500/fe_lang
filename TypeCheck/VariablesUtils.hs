@@ -11,6 +11,7 @@ import Data.Map
 import Prelude hiding (lookup)
 import TypeCheck.Error
 import TypeCheck.LifetimeUtils
+import TypeCheck.Printer
 
 getVariable :: Identifier -> PreprocessorMonad Variable
 getVariable ident = do
@@ -52,8 +53,8 @@ addVariable ident mut value = do
 addUninitializedVariable :: Identifier -> Mutable -> Type -> PreprocessorMonad VariableId
 addUninitializedVariable ident mut t = do
     id <- checkShadowing ident
-    lifetime <- getLifetime
-    internalAddVariable (Just ident) mut (makeValue t lifetime) Free id
+    p <- gets position
+    internalAddVariable (Just ident) mut (makeValue p t True) Free id
 
 -- does not change lifetimes, takes it from the environment
 addTemporaryVariable :: Mutable -> Value -> PreprocessorMonad VariableId
@@ -66,15 +67,19 @@ internalAddVariable identifier mut value variableState id = do
     variables <- gets variables
     lifetime <- getLifetime
     let variable = Variable {
-        createdAt = p,
+        variableCreatedAt = p,
         variableName = identifier,
         variableId = -1,
         variableMutability = mut,
         variableType = valueType value,
         variableState = variableState,
-        variableValue = value
+        variableValue = value,
+        lifetime = lifetime
     }
-    helper identifier variable variables id
+    x <- helper identifier variable variables id
+    addWarning $ Debug ("Adding variable " ++ show identifier ++ " at " ++ show p)
+    printVariables
+    return x
   where
     helper ident variable (Variables (Global mappings) variables) maybeId = do
         state <- get
@@ -123,5 +128,5 @@ checkShadowing name = do
         (i, _) <- maybeVar
         Just i
   where
-    shadowingOk (_, Variable _ _ t _ _ variableState _) =
+    shadowingOk (_, Variable _ _ t _ _ variableState _ _) =
         isFunction t && variableState == Uninitialized

@@ -1,15 +1,15 @@
 fn fib(first: i32, second: i32, cur: i32, max: i32) -> i32 {
-	if (cur < max) {
-		fib(second, first + second, cur + 1, max)
-	} else {
-		first
-	}
+    if (cur < max) {
+        fib(second, first + second, cur + 1, max)
+    } else {
+        first
+    }
 }
 
 fn getNthFib(n: i32) -> i32 {
-	fib(0, 1, 0, n)
+    fib(0, 1, 0, n)
 }
 
 fn main() -> i32 {
-	getNthFib(6)
+    getNthFib(6)
 }

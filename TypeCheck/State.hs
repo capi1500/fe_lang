@@ -25,9 +25,9 @@ data Variables = Variables VariableMappings [Variable]
 data LifetimeState = LifetimeState Lifetime Int
     deriving (Eq, Ord, Show, Read)
 
-data ExpressionType = PlaceType VariableId | ValueType Value | AssigneeType
-    deriving (Eq, Ord, Show, Read)
 data ExpressionContext = PlaceContext Mutable | ValueContext
+    deriving (Eq, Ord, Show, Read)
+data ExpressionType = PlaceType VariableId | ValueType Value
     deriving (Eq, Ord, Show, Read)
 
 data PreprocessorState = PreprocessorState {
@@ -43,7 +43,7 @@ data PreprocessorState = PreprocessorState {
 data TypedExpression = TypedExpression Expression ExpressionType -- expression, type of expression
   deriving (Eq, Ord, Show, Read)
 
-type PreprocessorMonad a = StateT PreprocessorState (Except (PreprocessorError, PreprocessorState)) a
+type PreprocessorMonad a = ExceptT PreprocessorError (State PreprocessorState) a
 
 makePreprocessorState :: PreprocessorState
 makePreprocessorState = PreprocessorState {
@@ -110,13 +110,5 @@ putPosition position = do
     PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd _ <- get
     put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
 
-instance CodePrint TypedExpression where
-    codePrint tabs (TypedExpression expr _) = codePrint tabs expr
-
-instance CodePrint Variables where
-  codePrint tabs (Variables _ list) = "[" ++ intercalate ("\n" ++ printTabs tabs) (fmap show list) ++ "]"
-
 throw :: PreprocessorError -> PreprocessorMonad a
-throw err = do
-    state <- get
-    throwError (err, state)
+throw = throwError

@@ -9,7 +9,6 @@ import Common.Types
 import Common.Utils
 import Common.Printer
 
-
 mainFunction :: Identifier
 mainFunction =  "main"
 
@@ -81,8 +80,6 @@ data BooleanDoubleOperator =
     Equals |
     Greater |
     Smaller |
-    GreaterEquals |
-    SmallerEquals |
     LazyAnd |
     LazyOr
   deriving (Eq, Ord, Show, Read)

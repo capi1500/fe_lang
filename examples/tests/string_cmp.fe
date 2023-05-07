@@ -1,0 +1,10 @@
+fn main() -> bool {
+    const x = "hello";
+    const t = "there";
+    const ret = if (x == "hello") {
+                    x == t
+                } else {
+                    true
+                };
+    ret
+}

@@ -66,16 +66,15 @@ type PreprocessorOutput = Code
 
 typeCheckStage :: A.Code -> IO PreprocessorOutput
 typeCheckStage code =
-    let err = runExcept $ runStateT (typeCheck code) makePreprocessorState in
-    handleTypeCheckError err
+    handleTypeCheckError $ runState (runExceptT (typeCheck code)) makePreprocessorState
 
-handleTypeCheckError :: Either (PreprocessorError, PreprocessorState) (Code, PreprocessorState) -> IO PreprocessorOutput
-handleTypeCheckError (Left (err, state)) = do
+handleTypeCheckError :: (Either PreprocessorError Code, PreprocessorState) -> IO PreprocessorOutput
+handleTypeCheckError (Left err, state) = do
     putStrLn "Error in type checker"
     print err
     printWarnings state
     exitFailure
-handleTypeCheckError (Right (ast, state)) = do
+handleTypeCheckError (Right ast, state) = do
     printWarnings state
     return ast
 
