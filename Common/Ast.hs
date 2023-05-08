@@ -59,7 +59,7 @@ data Expression =
     -- ArrayExpressionDefault Expression Expression |
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
-    CallExpression Expression [(Identifier, Expression)] | -- ident, is_reference, expression
+    CallExpression Expression [Expression] | -- ident, is_reference, expression
     IndexExpression Expression Expression |
     UnaryMinusExpression Expression |
     UnaryNegationExpression Expression |
@@ -103,7 +103,7 @@ data Value =
     VUnit |
     VStruct (Map Identifier Pointer) |
     VVariant Int Pointer | -- value_tag, value
-    VFunction [Pointer] Expression | -- captures, code
+    VFunction [Identifier] Expression | -- params, code
     VArray [Pointer] | -- values
     VReference Pointer
 

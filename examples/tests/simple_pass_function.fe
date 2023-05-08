@@ -1,0 +1,7 @@
+fn applier(f: Fn(i32), a: i32) {
+	f(a);
+}
+
+fn main() {
+	applier(print_i32, 5);
+}

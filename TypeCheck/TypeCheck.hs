@@ -49,7 +49,11 @@ instance TypeCheck A.Type Type where
         t' <- typeCheck t
         modifyType t' modifier
     typeCheck (A.TypeFunction p functionKind lifetime params returnType) = do
-        throw $ Other "Type functions not yet implemented" p
+        functionKind' <- typeCheck functionKind
+        typeCheck lifetime :: PreprocessorMonad ()
+        params' <- traverse typeCheck params
+        returnType' <- typeCheck returnType
+        return $ TFunction functionKind' params' returnType'
 
 instance TypeCheck A.Code Code where
     typeCheck :: A.Code -> PreprocessorMonad Code
@@ -72,11 +76,7 @@ addToScope (A.ItemFunction p (A.Ident ident) lifetimes params returnType _) = do
     params' <- traverse typeCheck params
     declaredReturnType <- typeCheck returnType
     -- lifetimes' <- typeCheck lifetimes -- TODO: check explicit lifetimes
-    let t = TFunction
-            (NamedFunction ident)
-            Fn
-            params'
-            declaredReturnType
+    let t = TFunction Fn params' declaredReturnType
     makeValue p t True >>= addVariable ident Const
     return ()
 addToScope (A.ItemStruct p ident lifetimes fields) = do
@@ -119,18 +119,17 @@ instance TypeCheck A.Item Statement where
         putPosition p
         Variable _ _ functionType id _ _ value _ <- getVariable name
 
-        let TFunction _ _ declaredParams declaredType = functionType
+        let TFunction _ declaredParams declaredType = functionType
 
-        let addFunctionParam = \(FunctionParam i t, p) -> do
+        let addFunctionParam = \(t, A.Parameter p (A.Ident name) _) -> do
                 putPosition p
-                makeValue p t True >>= addVariable i Mutable
-                return i
+                makeValue p t True >>= addVariable name Mutable
+                return name
 
         putPosition p
         (expression', actualType, paramIds) <- inNewFrame $ do
-                paramIds <- traverse addFunctionParam (zip declaredParams (fmap hasPosition params))
+                paramIds <- traverse addFunctionParam (zip declaredParams params)
                 (expression', value) <- typeCheckInValueContext expression
-                -- TODO: check if any dangling reference is returned
                 unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
                 dropValue value
                 return (expression', valueType value, paramIds)
@@ -167,18 +166,15 @@ instance TypeCheck A.Item Statement where
 
         return $ NewVariableStatement name initialization'
 
-instance TypeCheck A.FunctionParam FunctionParam where
-    typeCheck :: A.FunctionParam -> PreprocessorMonad FunctionParam
-    typeCheck (A.Parameter p (A.Ident ident) t) = do
+instance TypeCheck A.FunctionParam (Identifier, Type) where
+    typeCheck :: A.FunctionParam -> PreprocessorMonad (Identifier, Type)
+    typeCheck (A.Parameter p (A.Ident name) t) = do
         t' <- typeCheck t
-        return $ FunctionParam ident t'
+        return (name, t')
 
-instance TypeCheck A.FunctionReturnType Type where
-    typeCheck :: A.FunctionReturnType -> PreprocessorMonad Type
-    typeCheck (A.ReturnValue p t) = do
-        typeCheck t
-    typeCheck (A.ReturnUnit p) = do
-        return unitType
+instance TypeCheck A.FunctionParam Type where
+    typeCheck :: A.FunctionParam -> PreprocessorMonad Type
+    typeCheck (A.Parameter p _ t) = typeCheck t
 
 instance TypeCheck A.TypeDeclaration Type where
     typeCheck :: A.TypeDeclaration -> PreprocessorMonad Type
@@ -271,14 +267,14 @@ instance TypeCheck A.Expression TypedExpression where
         let TReference Const functionType = valueType borrowedValue
         unless (isFunction functionType) $ do throw (ExpressionNotCallable p functionType)
 
-        let TFunction _ kind declaredParams returnType = functionType
+        let TFunction kind declaredParams returnType = functionType
         when (length params /= length declaredParams) $ throw (WrongNumberOfParams p functionType)
-        let paramCheck = \(FunctionParam paramIdent paramDeclaredType, A.CallParam _ param) -> do
+        let paramCheck = \(paramDeclaredType, A.CallParam _ param) -> do
             (paramExpression, paramValue) <- typeCheckInValueContext param
             assertType (hasPosition param) (valueType paramValue) paramDeclaredType
             addWarning $ Debug ("Passing value: " ++ codePrint 1 paramValue)
             dropValue paramValue -- TODO: for now, drop, transfer to return value when allowing for explicit lifetimes
-            return (paramIdent, paramExpression)
+            return paramExpression
 
         params' <- traverse paramCheck (zip declaredParams params)
         dropValue borrowedValue
@@ -585,6 +581,32 @@ instance TypeCheck A.CallParam TypedExpression where
     typeCheck :: A.CallParam -> PreprocessorMonad TypedExpression
     typeCheck (A.CallParam _ expression) = do
         typeCheck expression
+
+instance TypeCheck A.FunctionKind FunctionKind where
+    typeCheck (A.Once _) = return FnOnce
+    typeCheck (A.Normal _) = return Fn
+
+instance TypeCheck A.FunctionTypeParam Type where
+    typeCheck (A.FunctionTypeParam _ t) = typeCheck t
+
+instance TypeCheck A.Lifetime () where
+    typeCheck (A.ExplicitLifetime p t) =
+        throw $ Other "Explicit lifetimes not yet implemented" p
+    typeCheck (A.ImplicitLifetime _) = return ()
+
+instance TypeCheck A.FunctionTypeReturnType Type where
+    typeCheck :: A.FunctionTypeReturnType -> PreprocessorMonad Type
+    typeCheck (A.FunctionTypeReturnType _ t) = do
+        typeCheck t
+    typeCheck (A.FunctionTypeReturnTypeUnit _) = do
+        return unitType
+
+instance TypeCheck A.FunctionReturnType Type where
+    typeCheck :: A.FunctionReturnType -> PreprocessorMonad Type
+    typeCheck (A.ReturnValue _ t) = do
+        typeCheck t
+    typeCheck (A.ReturnUnit _) = do
+        return unitType
 
 typeCheckInValueContext :: (TypeCheck a TypedExpression, HasPosition a) => a -> PreprocessorMonad (Expression, Value)
 typeCheckInValueContext e = withinContext $ do

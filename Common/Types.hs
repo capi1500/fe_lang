@@ -10,7 +10,7 @@ data Type =
     TPrimitive PrimitiveType |
     TStruct Identifier [Field] |
     TVariant Identifier [Type] |
-    TFunction FunctionName FunctionKind [FunctionParam] Type |
+    TFunction FunctionKind [Type] Type |
     TArray Type |
     TReference Mutable Type
   deriving (Eq, Ord, Show, Read)
@@ -64,16 +64,16 @@ isFunction :: Type -> Bool
 isFunction TFunction {} = True
 isFunction _ = False
 
-isNamedFunction :: Type -> Bool
-isNamedFunction (TFunction (NamedFunction _) _ _ _) = True
-isNamedFunction _ = False
+-- isFunction :: Type -> Bool
+-- isNamedFunction (TFunction {}) = True
+-- isNamedFunction _ = False
 
-isClosure :: Type -> Bool
-isClosure (TFunction Unnamed _ _ _) = True
-isClosure _ = False
+-- isClosure :: Type -> Bool
+-- isClosure (TFunction Unnamed _ _ _) = True
+-- isClosure _ = False
 
 isOnceFunction :: Type -> Bool
-isOnceFunction (TFunction _ FnOnce _ _) = True
+isOnceFunction (TFunction FnOnce _ _) = True
 isOnceFunction _ = False
 
 isReference :: Type -> Bool
@@ -98,19 +98,13 @@ getStricterOfFunctionKinds Fn Fn = Fn
 
 isCopy :: Type -> Bool
 isCopy (TPrimitive _) = True
-isCopy t = isNamedFunction t
+isCopy t = isFunction t
 
 data Field = Field Identifier Type
   deriving (Eq, Ord, Show, Read)
 
 data FunctionName = NamedFunction Identifier | Unnamed
   deriving (Eq, Ord, Show, Read)
-
-data FunctionParam = FunctionParam Identifier Type
-  deriving (Ord, Show, Read)
-
-instance Eq FunctionParam where
-  (==) (FunctionParam _ t1) (FunctionParam _ t2) = t1 == t2
 
 data FunctionKind =
     Fn |
@@ -133,13 +127,10 @@ instance CodePrint Type where
     codePrint tabs (TPrimitive p) = show p
     codePrint tabs (TStruct ident _) = "struct " ++ ident
     codePrint tabs (TVariant ident _) = "variant " ++ ident
-    codePrint tabs (TFunction name kind params ret) = show kind ++ codePrint tabs name ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
+    codePrint tabs (TFunction kind params ret) = show kind ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
     codePrint tabs (TArray t) = "[" ++ codePrint tabs t ++ "]"
     codePrint tabs (TReference Const t) = "&" ++ codePrint tabs t
     codePrint tabs (TReference Mutable t) = "&mut " ++ codePrint tabs t
-
-instance CodePrint FunctionParam where
-    codePrint tabs (FunctionParam _ t) = codePrint tabs t
 
 instance CodePrint FunctionName where
     codePrint tabs (NamedFunction ident) = " " ++ ident

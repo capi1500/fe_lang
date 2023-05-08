@@ -1,0 +1,20 @@
+fn adder(x: &mut i32) {
+	*x = *x + 1;
+}
+
+fn applier1(f: Fn(&mut i32), a: &mut i32) {
+	f(a);
+}
+
+fn applier2(f: Fn(i32), a: i32) {
+	f(a);
+}
+
+fn main() {
+	var x = 0;
+	applier1(adder, &mut x);
+	applier1(adder, &mut x);
+	applier1(adder, &mut x);
+	applier1(adder, &mut x);
+	applier2(print_i32, x);
+}

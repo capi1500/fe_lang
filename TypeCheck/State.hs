@@ -83,7 +83,7 @@ makeInternalFunction id name t = Variable {
     lifetime = staticLifetime
 }
 
-fromInternals :: [(Identifier, Type, Expression)] -> Variables
+fromInternals :: [(Identifier, Type, a)] -> Variables
 fromInternals names =
     let zipped = zip names [0..(length names)] in
     Variables

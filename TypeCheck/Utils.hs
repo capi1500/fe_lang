@@ -90,10 +90,10 @@ getShorterOfLifetimesOrThrow p1 p2 first second = do
 -- assumes f1 and f2 are function types
 mergeFunctionTypesOrThrow :: A.BNFC'Position -> Type -> Type -> PreprocessorMonad Type
 mergeFunctionTypesOrThrow p f1 f2 = do
-    let TFunction name1 kind1 params1 returnType1 = f1
-    let TFunction _ kind2 params2 returnType2 = f2
+    let TFunction kind1 params1 returnType1 = f1
+    let TFunction kind2 params2 returnType2 = f2
     when (params1 /= params2 || returnType1 /= returnType2) $ throw (TypeMismatch p f1 f2)
-    return $ TFunction name1 (getStricterOfFunctionKinds kind1 kind2) params1 returnType1
+    return $ TFunction (getStricterOfFunctionKinds kind1 kind2) params1 returnType1
 
 nameOfItem :: A.Item -> String
 nameOfItem (A.ItemFunction _ (A.Ident ident) _ _ _ _) = ident

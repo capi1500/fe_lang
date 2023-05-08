@@ -17,7 +17,7 @@ instance CodePrint Statement where
 
 instance CodePrint Expression where
     codePrint tabs (BlockExpression statements) = "{\n" ++ intercalate "" (fmap (codePrint (tabs + 1)) statements) ++ "\n" ++ printTabs tabs ++ "}"
-    codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (\(_, e) -> codePrint tabs e) params) ++ ")"
+    codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
         codePrint tabs onTrue ++

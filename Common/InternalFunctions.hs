@@ -9,12 +9,13 @@ import Common.Printer
 import Common.AstPrinter
 import Control.Monad.State
 
-makeInternalFunction :: Identifier -> [(Identifier, Type)] -> Type -> Expression -> (Identifier, Type, Expression)
+makeInternalFunction :: Identifier -> [(Identifier, Type)] -> Type -> Expression -> (Identifier, Type, Value)
 makeInternalFunction name params return e =
-    let t = TFunction (NamedFunction name) Fn (fmap (uncurry FunctionParam) params) return in
-    (name, t, e)
+    let t = TFunction Fn (fmap snd params) return in
+    let v = VFunction (fmap fst params) e in
+    (name, t, v)
 
-internals :: [(Identifier, Type, Expression)]
+internals :: [(Identifier, Type, Value)]
 internals = [
         makeInternalFunction "print_i32" [("v", i32Type)] unitType (InternalExpression printFunction),
         makeInternalFunction "input_i32" [] i32Type (InternalExpression inputI32Function)

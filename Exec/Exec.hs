@@ -27,7 +27,7 @@ class Executable a b where
 instance Executable Code () where
     execute :: Code -> ExecutorMonad ()
     execute (Code statements) = do
-        traverse_ (\(name, _, e) -> addVariable name (Variable $ VFunction [] e)) internals
+        traverse_ (\(name, _, v) -> addVariable name (Variable v)) internals
         traverse_ initializeGlobalScope statements
         ExecutionState _ mainId _ <- get
         (_, Variable (VFunction _ code)) <- getVariable mainFunction
@@ -53,7 +53,7 @@ instance Executable Statement Value where
         printLocalScope
         return VUnit
     execute (NewFunctionStatement ident expression paramIdents) = do
-        let value = Variable $ VFunction [] expression
+        let value = Variable $ VFunction paramIdents expression
         addVariable ident value
         return VUnit
     execute (ExpressionStatement expression) = do
@@ -106,10 +106,10 @@ instance Executable Expression Value where
         VI32 index <- execute e2
         return $ VReference (listGet index array)
     execute (CallExpression function_object params) = do
-        VFunction _ code <- execute function_object >>= deref
+        VFunction param_names code <- execute function_object >>= deref
         params' <- traverse (\(i, e) -> do
             x <- execute e
-            return (i, x)) params
+            return (i, x)) (zip param_names params)
         inNewScope $ do
             traverse_ (\(paramIdent, paramValue) -> do
                 addVariable paramIdent (Variable paramValue))
