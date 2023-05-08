@@ -15,7 +15,7 @@ import Control.Monad.State
 import qualified Fe.Abs as A
 import Fe.Abs (HasPosition(hasPosition))
 
-import Common.Ast hiding (Uninitialized, Variable, Value)
+import Common.Ast hiding (Other, Uninitialized, Variable, Value)
 import Common.Utils
 import Common.Types
 import Common.Scope
@@ -34,6 +34,7 @@ import TypeCheck.StateUtils
 import TypeCheck.BorrowCheckerUtils
 import TypeCheck.Printer
 import TypeCheck.ValueUtils (makeValue)
+import TypeCheck.ExpectationsUtils
 
 class TypeCheck a b where
     typeCheck :: a -> PreprocessorMonad b
@@ -126,6 +127,7 @@ instance TypeCheck A.Item Statement where
 
         putPosition p
         (expression', actualType, paramIds) <- inNewFrame $ do
+                setCurrentFunctionReturnType declaredType
                 paramIds <- traverse addFunctionParam (zip declaredParams params)
                 (expression', value) <- typeCheckInValueContext expression
                 unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
@@ -229,11 +231,13 @@ instance TypeCheck A.Expression TypedExpression where
             (condition', conditionValue) <- typeCheckInValueContext condition
             assertType (hasPosition condition) (valueType conditionValue) boolType
             return condition'
+        setInsideLoopExpression True
         printDebug "First while"
         (block', blockValue) <- typeCheckInValueContext block
         -- TODO: should disable warnings, but not errors
         printDebug "Second while"
         (block', blockValue) <- typeCheckInValueContext block -- check if block can be executed multiple times (so no move happens inside etc.)
+        setInsideLoopExpression False
         et <- makeValue p unitType False >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
     typeCheck (A.VariableExpression p (A.Ident name)) = do
@@ -280,8 +284,9 @@ instance TypeCheck A.Expression TypedExpression where
         let TFunction kind declaredParams returnType = functionType
         when (length params /= length declaredParams) $ throw (WrongNumberOfParams p functionType)
         let paramCheck = \(paramDeclaredType, A.CallParam _ param) -> do
-            printVariables
+            setCallParamType (Just paramDeclaredType)
             (paramExpression, paramValue) <- typeCheckInValueContext param
+            setCallParamType Nothing
             assertType (hasPosition param) (valueType paramValue) paramDeclaredType
             printDebug ("Passing value: " ++ codePrint 1 paramValue)
             dropValue paramValue -- TODO: for now, drop, transfer to return value when allowing for explicit lifetimes
@@ -416,6 +421,27 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.AssignmentExpression p e1 operator e2) = do
         putPosition p
         makeAssignmentExpression operator e1 e2
+    typeCheck (A.BreakExpression p) = do
+        expectations <- gets expectations
+        unless (insideLoopExpression expectations) $ throw (BreakNotInLoop p)
+        et <- makeValue p unitType False >>= createValueExpression
+        return $ TypedExpression BreakExpression et
+    typeCheck (A.ContinueExpression p) = do
+        expectations <- gets expectations
+        unless (insideLoopExpression expectations) $ throw (ContinueNotInLoop p)
+        et <- makeValue p unitType False >>= createValueExpression
+        return $ TypedExpression ContinueExpression et
+    typeCheck (A.ReturnExpressionUnit p) = do
+        expectations <- gets expectations
+        assertType p unitType (currentFunctionReturnType expectations)
+        et <- makeValue p unitType False >>= createValueExpression
+        return $ TypedExpression (ReturnExpression (LiteralExpression VUnit)) et
+    typeCheck (A.ReturnExpressionValue p e) = do
+        (e', v) <- typeCheckInValueContext e
+        expectations <- gets expectations
+        assertType p (valueType v) (currentFunctionReturnType expectations)
+        et <- createValueExpression v
+        return $ TypedExpression (ReturnExpression e') et
     typeCheck x = do
         throw $ Other "Expression not yet implemented" (hasPosition x)
 

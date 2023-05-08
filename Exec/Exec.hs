@@ -1,13 +1,14 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Exec.Exec where
 
 import Common.Types
 import Control.Applicative (empty)
 import Common.Ast
 import Exec.State
-import Exec.Error
 import Control.Monad.Except (MonadError(..), liftIO)
 import Data.Bits
 import Control.Monad (when, unless)
@@ -21,6 +22,8 @@ import Common.AstPrinter
 import Common.InternalFunctions
 import Common.Utils (listGet)
 import Fe.Abs (BNFC'Position)
+import Control.Exception
+import GHC.IO (catchAny)
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -82,10 +85,20 @@ instance Executable Expression Value where
     execute (WhileExpression condition block) = do
         VBool bool <- execute condition
         if bool then do
-            execute block :: ExecutorMonad Value
-            execute $ WhileExpression condition block
+            x <- do {
+                execute block :: ExecutorMonad Value;
+                return True } `catchError` handler
+            if x then do
+                execute (WhileExpression condition block)
+            else do
+                return VUnit
         else do
             return VUnit
+        where
+            handler :: ExecutionError -> ExecutorMonad Bool
+            handler Break = return False
+            handler Continue = return True
+            handler x = throwError x
     execute (MakeArrayExpression expressions) = do
         values <- traverse execute expressions
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
@@ -122,7 +135,12 @@ instance Executable Expression Value where
             traverse_ (\(paramIdent, paramValue) -> do
                 addVariable paramIdent (Variable paramValue))
                 params'
-            execute code
+
+            do { execute code } `catchError` handler
+        where
+            handler :: ExecutionError -> ExecutorMonad Value
+            handler (Return v) = return v
+            handler x = throwError x
     execute (I32DoubleOperatorExpression p operator e1 e2) = do
         v1 <- execute e1
         v2 <- execute e2
@@ -142,6 +160,13 @@ instance Executable Expression Value where
     execute (UnaryNegationExpression e) = do
         VBool v <- execute e
         return $ VBool (not v)
+    execute (ReturnExpression e) = do
+        v <- execute e
+        throwError $ Return v
+    execute BreakExpression = do
+        throwError Break
+    execute ContinueExpression = do
+        throwError Continue
     execute (InternalExpression f) = do
         f
 

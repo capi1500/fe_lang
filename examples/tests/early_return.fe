@@ -1,0 +1,11 @@
+fn foo() -> i32 {
+	if (true) {
+		return 5;
+	}
+	2
+}
+
+fn main() {
+	print_i32(foo());
+	print_string("\n");
+}

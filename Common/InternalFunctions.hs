@@ -14,7 +14,6 @@ import Common.AstPrinter
 
 import Exec.StateFunctions
 import Exec.State
-import Exec.Error
 import Data.ByteString (intercalate)
 
 makeInternalFunction :: Identifier -> [(Identifier, Type)] -> Type -> Expression -> (Identifier, Type, Value)

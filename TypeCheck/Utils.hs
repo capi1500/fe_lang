@@ -8,7 +8,7 @@ import Control.Monad.State
 
 import qualified Fe.Abs as A
 
-import Common.Ast hiding (Value)
+import Common.Ast hiding (Other, Value)
 import Common.Types
 import Common.Utils
 import Common.Scope

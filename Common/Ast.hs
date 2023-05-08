@@ -12,11 +12,32 @@ import Common.Utils
 import Common.Printer
 import Common.Scope
 
-import Exec.Error
 import Fe.Abs (BNFC'Position)
 
 mainFunction :: Identifier
 mainFunction =  "main"
+
+data ExecutionError =
+    DivisionByZero BNFC'Position |
+    ShiftInvalidArgument BNFC'Position Int |
+    InputFailed BNFC'Position |
+    IndexOutOfRange BNFC'Position Int Int | -- where, index, size
+    Break |
+    Continue |
+    Return Value |
+    Other String |
+    TypeCheckerFailed String
+
+instance Show ExecutionError where
+    show (DivisionByZero p) = "Division by zero at: " ++ show p
+    show (ShiftInvalidArgument p arg) = "Invalid shift argument: " ++ show arg ++ ", at: " ++ show p
+    show (InputFailed p) = "Input failed at: " ++ show p
+    show (IndexOutOfRange p index size) = "Index: " ++ show index ++ " out of range [0, " ++ show size ++ "] at: " ++ show p
+    show Break = "Break"
+    show Continue = "Continue"
+    show (Return value) = "Return"
+    show (Other string) = "Other " ++ string
+    show (TypeCheckerFailed string) = "FATAL: " ++ string
 
 data Variable = Variable Value | Uninitialized
 
@@ -28,7 +49,7 @@ data ExecutionState = ExecutionState {
     position :: BNFC'Position
 }
 
-type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
+type ExecutorMonad a = ExceptT ExecutionError (StateT ExecutionState IO) a
 
 type Pointer = Int
 
@@ -72,11 +93,11 @@ data Expression =
     -- LazyAndExpression Expression Expression |
     -- LazyOrExpression Expression Expression |
     -- RangeExpression Expression Expression |
-    AssignmentExpression Expression Expression -- expression1, expression2
-    -- BreakExpression |
-    -- ContinueExpression |
+    AssignmentExpression Expression Expression | -- expression1, expression2
+    BreakExpression |
+    ContinueExpression |
     -- ReturnExpressionUnit |
-    -- ReturnExpressionValue Expression
+    ReturnExpression Expression
 
 data NumericDoubleOperator =
     Plus |
@@ -116,11 +137,3 @@ isString = all isChar
 isChar :: Value -> Bool
 isChar (VChar _) = True
 isChar _ = False
-
--- isPrimitiveValue :: Value -> Bool
--- isPrimitiveValue (VI32 _) = True
--- isPrimitiveValue (VChar _) = True
--- isPrimitiveValue (VBool _) = True
--- isPrimitiveValue VUnit = True
--- isPrimitiveValue (VArray _ _) = True
--- isPrimitiveValue _ = False

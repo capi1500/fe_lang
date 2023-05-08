@@ -32,6 +32,12 @@ data ExpressionContext = PlaceContext Mutable | ValueContext
 data ExpressionType = PlaceType Mutable VariableId | ValueType Value
     deriving (Eq, Ord, Show, Read)
 
+data Expectations = Expectations {
+    currentFunctionReturnType :: Type,
+    callParamType :: Maybe Type,
+    insideLoopExpression :: Bool
+} deriving (Eq, Ord, Show, Read)
+
 data PreprocessorState = PreprocessorState {
     typeDefinitions :: TypeDefinitions, -- follows code scopes
     variables :: Variables, -- follows code scopes, resets on function frames
@@ -39,7 +45,8 @@ data PreprocessorState = PreprocessorState {
     warnings :: [PreprocessorWarning], -- only grows
     context :: ExpressionContext,
     toDropAtStatementEnd :: [VariableId],
-    position :: BNFC'Position
+    position :: BNFC'Position,
+    expectations :: Expectations
 } deriving (Eq, Ord, Show, Read)
 
 data TypedExpression = TypedExpression Expression ExpressionType -- expression, type of expression
@@ -61,7 +68,12 @@ makePreprocessorState = PreprocessorState {
     warnings = [],
     context = ValueContext,
     toDropAtStatementEnd = [],
-    position = Nothing
+    position = Nothing,
+    expectations = Expectations {
+        currentFunctionReturnType = unitType,
+        callParamType = Nothing,
+        insideLoopExpression = False
+    }
 }
 
 makeInternalFunction :: VariableId -> Identifier -> Type -> Variable
@@ -94,48 +106,53 @@ staticLifetime = Lifetime [0] 1
 
 putTypeDefinitions :: TypeDefinitions -> PreprocessorMonad ()
 putTypeDefinitions typeDefinitions = do
-    PreprocessorState _ variables currentLifetime warnings context toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+    PreprocessorState _ variables currentLifetime warnings context toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations
 
 putVariables :: Variables -> PreprocessorMonad ()
 putVariables variables = do
-    PreprocessorState typeDefinitions _ currentLifetime warnings context toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+    PreprocessorState typeDefinitions _ currentLifetime warnings context toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations
 
 putLifetimeState :: LifetimeState -> PreprocessorMonad ()
 putLifetimeState lifetimeState = do
-    PreprocessorState typeDefinitions variables _ warnings context toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables lifetimeState warnings context toDropAtStatementEnd position
+    PreprocessorState typeDefinitions variables _ warnings context toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables lifetimeState warnings context toDropAtStatementEnd position expectations
 
 putWarnings :: [PreprocessorWarning] -> PreprocessorMonad ()
 putWarnings warnings = do
-    PreprocessorState typeDefinitions variables currentLifetime _ context toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+    PreprocessorState typeDefinitions variables currentLifetime _ context toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations
 
 addWarning :: PreprocessorWarning -> PreprocessorMonad ()
 addWarning warning = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime (warning:warnings) context toDropAtStatementEnd position
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime (warning:warnings) context toDropAtStatementEnd position expectations
 
 putContext :: ExpressionContext -> PreprocessorMonad ()
 putContext context = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings _ toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+    PreprocessorState typeDefinitions variables currentLifetime warnings _ toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations
 
 markVariableAsToDrop :: VariableId -> PreprocessorMonad ()
 markVariableAsToDrop id = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context (listPushBack id toDropAtStatementEnd) position
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context (listPushBack id toDropAtStatementEnd) position expectations
 
 clearVariablesToDrop :: PreprocessorMonad ()
 clearVariablesToDrop = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings context _ position <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context [] position
+    PreprocessorState typeDefinitions variables currentLifetime warnings context _ position expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context [] position expectations
 
 putPosition :: BNFC'Position -> PreprocessorMonad ()
 putPosition position = do
-    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd _ <- get
-    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd _ expectations <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations
+
+putExpectations :: Expectations -> PreprocessorMonad ()
+putExpectations expectations = do
+    PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position _ <- get
+    put $ PreprocessorState typeDefinitions variables currentLifetime warnings context toDropAtStatementEnd position expectations
 
 throw :: PreprocessorError -> PreprocessorMonad a
 throw = throwError

@@ -20,7 +20,6 @@ import TypeCheck.State (PreprocessorState (PreprocessorState, warnings), makePre
 
 import Exec.Exec
 import Exec.State
-import Exec.Error
 import Common.Printer
 import Common.AstPrinter
 import Data.List (intercalate)
@@ -87,11 +86,11 @@ printWarnings state = do
 executeStage :: PreprocessorOutput -> IO ()
 executeStage code = do
     input <- getContents
-    out <- runExceptT $ runStateT (execute code) (makeExecutionState (words input))
+    (out, _) <- runStateT (runExceptT (execute code)) (makeExecutionState (words input))
     handleExecutionError out
     return ()
 
-handleExecutionError :: Either ExecutionError ((), ExecutionState) -> IO ()
+handleExecutionError :: Either ExecutionError () -> IO ()
 handleExecutionError (Left err) = do
     putStrLn "Error during execution"
     print err

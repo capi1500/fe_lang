@@ -9,6 +9,7 @@ import Common.Scope
 import Exec.State
 import Data.Maybe
 import Common.Ast
+import Control.Monad.Except
 
 addVariable :: Identifier -> Variable -> ExecutorMonad Pointer
 addVariable ident variable = do
@@ -58,6 +59,19 @@ removeVariable ident = do
     helper (Global map) id = Global $ insert ident id map
     helper (Local parent map) id = Local parent (insert ident id map)
 
+-- inNewScope :: ExecutorMonad a -> ExecutorMonad a
+-- inNewScope f = do
+--     state <- get
+--     let mappings = variableMappings state  -- record current state
+--     putMappings $ Local mappings empty
+--     ret <- do { f } `catchError` handler mappings
+--     putMappings mappings
+--     return ret
+--   where
+--     handler mappings error = do
+--         putMappings mappings
+--         throwError error
+
 inNewScope :: ExecutorMonad a -> ExecutorMonad a
 inNewScope f = do
     state <- get
@@ -66,16 +80,6 @@ inNewScope f = do
     ret' <- f
     putMappings mappings
     return ret'
-
-inNewFrame :: ExecutorMonad a -> ExecutorMonad a
-inNewFrame f = do
-    state <- get
-    let mappings = variableMappings state  -- record current state
-    putMappings $ Local mappings empty
-    ret' <- f
-    putMappings mappings
-    return ret'
-
 
 makeNewFrame :: VariableMappings -> VariableMappings
 makeNewFrame (Global global) = Local (Global global) empty

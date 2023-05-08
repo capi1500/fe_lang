@@ -10,6 +10,7 @@ fn getNthFib(n: i32) -> i32 {
     fib(0, 1, 0, n)
 }
 
-fn main() -> i32 {
-    getNthFib(6)
+fn main() {
+    print_i32(getNthFib(6));
+	print_char('\n');
 }

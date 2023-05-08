@@ -36,6 +36,8 @@ data PreprocessorError =
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |
     CannotComapreFunctions Type |
+    BreakNotInLoop BNFC'Position |
+    ContinueNotInLoop BNFC'Position |
     Fatal String
   deriving (Eq, Ord, Show, Read)
 
