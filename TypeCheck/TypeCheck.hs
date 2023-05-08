@@ -309,7 +309,13 @@ instance TypeCheck A.Expression TypedExpression where
         let indexPlaceId = head $ ownedPlaces (variableValue array)
         et <- createPlaceExpression indexPlaceId
         dropValue borrow
-        return $ TypedExpression (IndexExpression e1' e2') et
+
+        context <- gets context
+        let mod = case context of
+              PlaceContext _ -> id
+              ValueContext -> DereferenceExpression
+
+        return $ TypedExpression (mod (IndexExpression e1' e2')) et
     typeCheck (A.UnaryExpression _ (A.UnaryMinus p) e) = do
         e' <- do
             (e', v) <- typeCheckInValueContext e

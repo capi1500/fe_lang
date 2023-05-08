@@ -1,0 +1,6 @@
+fn main() {
+	var tab = [1, 2, 3];
+	print_i32(tab[0]);
+	print_i32(tab[1]);
+	print_i32(tab[2]);
+}

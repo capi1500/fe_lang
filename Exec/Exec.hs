@@ -86,6 +86,11 @@ instance Executable Expression Value where
         values <- traverse execute expressions
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
         return $ VArray pointers
+    execute (MakeArrayDefaultsExpression e1 e2) = do
+        VI32 size <- execute e1
+        value <- execute e2
+        pointers <- traverse (\id -> do addTmpVariable (Variable value)) [1..size]
+        return $ VArray pointers
     execute (VariableExpression ident) = do
         (_, Variable value) <- getVariable ident
         return value
@@ -97,7 +102,7 @@ instance Executable Expression Value where
     execute (LiteralExpression value) = do
         return value
     execute (IndexExpression e1 e2) = do
-        VArray array <- execute e1
+        VArray array <- execute e1 >>= deref
         VI32 index <- execute e2
         return $ VReference (listGet index array)
     execute (CallExpression function_object params) = do
@@ -131,8 +136,6 @@ instance Executable Expression Value where
         return $ VBool (not v)
     execute (InternalExpression f) = do
         f
-    execute x = do
-        throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
 
 doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doBooleanDoubleOperator Equals v1 v2 = do
