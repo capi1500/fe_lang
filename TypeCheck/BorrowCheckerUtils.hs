@@ -56,8 +56,10 @@ moveOutOrCopyById variableId = do
 
 moveOutOrCopy :: Variable -> PreprocessorMonad ()
 moveOutOrCopy variable = do
-    if isCopy (variableType variable) then do return ()
-    else do moveOut variable
+    if isCopy (variableType variable) then do
+        return ()
+    else do
+        moveOut variable
 
 moveOutById :: VariableId -> PreprocessorMonad ()
 moveOutById variableId = do

@@ -15,10 +15,10 @@ makeValue p TUntyped owned = do
     return $ Value p TUntyped [] [] [] owned
 makeValue p (TPrimitive t) owned = do
     return $ Value p (TPrimitive t) [] [] [] owned
-makeValue p (TStruct name fields) owned = do
+makeValue p (TStruct fields) owned = do
     throw $ Other "Structs not yet implemented" p
     -- return $ Value p (TStruct name fields) [] [] [] owned
-makeValue p (TVariant name types) owned = do
+makeValue p (TVariant types) owned = do
     throw $ Other "Variants not yet implemented" p
     -- return $ Value p (TVariant name types) [] [] [] owned
 makeValue p (TFunction kind params ret) owned = do

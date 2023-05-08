@@ -8,12 +8,22 @@ import Data.List (intercalate)
 data Type =
     TUntyped |
     TPrimitive PrimitiveType |
-    TStruct Identifier [Field] |
-    TVariant Identifier [Type] |
+    TStruct [Field] |
+    TVariant [Type] |
     TFunction FunctionKind [Type] Type |
     TArray Type |
     TReference Mutable Type
   deriving (Eq, Ord, Show, Read)
+
+-- can type1 be used as type2
+canSubstitute :: Type -> Type -> Bool
+canSubstitute (TFunction Fn params1 return1) (TFunction _ params2 return2) =
+    all (uncurry canSubstitute) (zip params1 params2) && canSubstitute return1 return2
+canSubstitute (TFunction FnOnce params1 return1) (TFunction FnOnce params2 return2) =
+    all (uncurry canSubstitute) (zip params1 params2) && canSubstitute return1 return2
+canSubstitute (TReference Mutable t1) (TReference _ t2) = canSubstitute t1 t2
+canSubstitute (TReference Const t1) (TReference Const t2) = canSubstitute t1 t2
+canSubstitute t1 t2 = t1 == t2
 
 data PrimitiveType =
     I32 |
@@ -49,11 +59,11 @@ isPrimitive (TPrimitive _) = True
 isPrimitive _ = False
 
 isStruct :: Type -> Bool
-isStruct (TStruct _ _) = True
+isStruct (TStruct _) = True
 isStruct _ = False
 
 isVariant :: Type -> Bool
-isVariant (TVariant _ _) = True
+isVariant (TVariant _) = True
 isVariant _ = False
 
 isArray :: Type -> Bool
@@ -125,8 +135,8 @@ isMutable Mutable = True
 instance CodePrint Type where
     codePrint tabs TUntyped = "Untyped"
     codePrint tabs (TPrimitive p) = show p
-    codePrint tabs (TStruct ident _) = "struct " ++ ident
-    codePrint tabs (TVariant ident _) = "variant " ++ ident
+    codePrint tabs (TStruct _) = "struct"
+    codePrint tabs (TVariant _) = "variant"
     codePrint tabs (TFunction kind params ret) = show kind ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
     codePrint tabs (TArray t) = "[" ++ codePrint tabs t ++ "]"
     codePrint tabs (TReference Const t) = "&" ++ codePrint tabs t

@@ -141,18 +141,6 @@ fn p() {
 	*(&mut a);
 }
 
-fn r1(a: &mut i32) {
-	// a = 4; invalid
-	*a = 4;
-	println!("{}", a);
-}
-
-fn r2() {
-	let mut a = 1;
-	r1(&mut a);
-	println!("{}", a);
-}
-
 fn q1(a: &mut [i32]) {
 	//a = [4,5,6]; // invalid
 	a[1] = 5;
@@ -166,6 +154,34 @@ fn q2() {
 	println!("{:?}", a);
 }
 
+fn r1(a: &mut i32) {
+	// a = 4; invalid
+	*a = 4;
+	println!("{}", a);
+}
+
+fn r2() {
+	let mut a = 1;
+	let mut b = &mut a;
+	r1(b);
+	r1(b);
+	r1(b);
+	r1(b);
+	println!("{}", a);
+}
+
+fn s1(row: &[i32]) -> usize {
+	return row.len();
+}
+
+fn s2() {
+	let arr = [1,2,3];
+	let r = &arr;
+	let x = r;
+	let y = r;
+	println!("{:?} {:?} {:?}", r, x, y);
+}
+
 fn main() {
-	r2();
+	s2();
 }

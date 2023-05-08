@@ -99,15 +99,13 @@ instance TypeCheck A.Statement Statement where
         scope <- gets typeDefinitions
         unless (isGlobal scope) $ do addToScope item
         statement <- typeCheck item
-        -- printVariables
+        printVariables
         endStatement
         return statement
     typeCheck (A.ExpressionStatement p expression) = do
         putPosition p
         (expression', value) <- typeCheckInValueContext expression
-
-        -- printVariables
-
+        printVariables
         dropValue value
         endStatement
         return (ExpressionStatement expression')
@@ -282,6 +280,7 @@ instance TypeCheck A.Expression TypedExpression where
         let TFunction kind declaredParams returnType = functionType
         when (length params /= length declaredParams) $ throw (WrongNumberOfParams p functionType)
         let paramCheck = \(paramDeclaredType, A.CallParam _ param) -> do
+            printVariables
             (paramExpression, paramValue) <- typeCheckInValueContext param
             assertType (hasPosition param) (valueType paramValue) paramDeclaredType
             addWarning $ Debug ("Passing value: " ++ codePrint 1 paramValue)
@@ -540,6 +539,7 @@ ifExpression p condition onTrue onFalse = do
         assertType (hasPosition condition) (valueType conditionValue) boolType
         return condition'
 
+    -- need to preserve state of variables before onTrue and onFalse. Then merge them
     (onTrue', onTrueValue) <- do
         (onTrue', onTrueValue) <- typeCheckInValueContext onTrue
         -- addWarning $ Debug "onTrue"

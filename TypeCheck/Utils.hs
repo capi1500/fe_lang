@@ -24,7 +24,7 @@ import TypeCheck.LifetimeUtils
 
 assertType :: BNFC'Position -> Type -> Type -> PreprocessorMonad ()
 assertType p actualType expectedType = do
-    when (expectedType /= actualType) $
+    unless (canSubstitute actualType expectedType) $
         throw $ TypeMismatch p actualType expectedType
 
 isVariableCV :: A.CV -> Bool

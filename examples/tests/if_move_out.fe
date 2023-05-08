@@ -1,0 +1,9 @@
+fn main() {
+	var x = 4;
+	var y = &x;
+	if (true) {
+		print_i32(*y);
+	} else {
+		print_i32(*y);
+	}
+}

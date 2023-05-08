@@ -13,7 +13,7 @@ import TypeCheck.State
 import TypeCheck.Variable
 import TypeCheck.Error
 import TypeCheck.VariablesUtils
-import TypeCheck.BorrowCheckerUtils    
+import TypeCheck.BorrowCheckerUtils
 
 -- strong guarantee - value got inside a context (ie. place context) is of a coresponding type (ie. place type)
     -- value type holds unowned value, if it is not a primitive value, it needs to be droped/transfered on use
@@ -32,8 +32,11 @@ internalCreatePlaceExpression variableId (PlaceContext Const) = do
     return $ PlaceType Const variableId
 internalCreatePlaceExpression variableId ValueContext = do
     variable <- getVariableById variableId
+    -- if isReference (variableType variable) then do
+    --     value <- makeImplicitBorrowValue variableId Const
+    --     return $ ValueType value
+    -- else do
     let value = setValueOwned False (variableValue variable)
-    
     unless (isCopy (variableType variable)) $ mutateVariableById variableId (mutateVariableValue (setValueOwned False))
     moveOutOrCopyById variableId
     return $ ValueType value
