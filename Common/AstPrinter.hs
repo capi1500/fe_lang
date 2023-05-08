@@ -20,20 +20,19 @@ instance CodePrint Expression where
     codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (\(_, e) -> codePrint tabs e) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
-        codePrint tabs onTrue ++ 
+        codePrint tabs onTrue ++
         maybe "" (\onFalse -> "\n" ++ printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
     codePrint tabs (LiteralExpression value) = codePrint tabs value
     codePrint tabs (VariableExpression ident) = ident
     codePrint tabs (ReferenceExpression ident) = "&" ++ ident
     codePrint tabs (DereferenceExpression e) = "*" ++ codePrint tabs e
+    codePrint tabs (IndexExpression e1 e2) = codePrint tabs e1 ++ "[" ++ codePrint tabs e2 ++ "]"
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (I32DoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (UnaryMinusExpression e) = "-" ++ codePrint tabs e
     codePrint tabs (MakeArrayExpression values) =
-        if isString values then
-            show (fmap (\(VChar c) -> c) values)
-        else
-            "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
+        "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
+    codePrint tabs (MakeArrayDefaultsExpression e1 e2) = "[" ++ codePrint tabs e1 ++ "; " ++ codePrint tabs e2 ++ "]"
     codePrint tabs (AssignmentExpression e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
     codePrint tabs expr = "<internal>"
 

@@ -141,6 +141,17 @@ fn p() {
 	*(&mut a);
 }
 
+fn r1(a: &mut i32) {
+	*a = 4;
+	println!("{}", a);
+}
+
+fn r2() {
+	let mut a = 1;
+	r1(&mut a);
+	println!("{}", a);
+}
+
 fn main() {
-	p();
+	r2();
 }

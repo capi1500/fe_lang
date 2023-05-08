@@ -49,7 +49,8 @@ data Expression =
     -- MatchExpression Expression [MatchArm]
     InternalExpression (ExecutorMonad Value) |
     LiteralExpression Value |
-    MakeArrayExpression [Value] |
+    MakeArrayExpression [Expression] |
+    MakeArrayDefaultsExpression Expression Expression | -- size, default
     VariableExpression Identifier | -- ident, isRef
     ReferenceExpression Identifier |
     DereferenceExpression Expression |
@@ -59,14 +60,12 @@ data Expression =
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
     CallExpression Expression [(Identifier, Expression)] | -- ident, is_reference, expression
-    -- IndexExpression Expression Expression |
-    -- UnaryExpression UnaryOperator Expression |
+    IndexExpression Expression Expression |
     UnaryMinusExpression Expression |
     UnaryNegationExpression Expression |
     -- TypeCastExpression Expression (Type) |
     I32DoubleOperatorExpression NumericDoubleOperator Expression Expression |
     BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression |
-    -- ComparisonExpression Expression ComparisonOperator Expression |
     -- LazyAndExpression Expression Expression |
     -- LazyOrExpression Expression Expression |
     -- RangeExpression Expression Expression |

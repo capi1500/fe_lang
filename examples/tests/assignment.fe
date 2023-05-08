@@ -1,5 +1,5 @@
 fn main() -> i32 {
-    var x = 5;
+    var x: i32;
     var y = 4;
     x = y;
     y = 10;

@@ -39,7 +39,6 @@ TypeArray. Type ::= ArrayType ;
 TypeModified. Type ::= TypeModifier Type ;
 TypeFunction. Type ::= FunctionKind Lifetime "(" [FunctionTypeParam] ")" FunctionTypeReturnType ;
 
-None. TypeModifier ::= "" ; 
 Ref. TypeModifier ::= "&" Lifetime ;
 MutRef. TypeModifier ::= "&" Lifetime "mut" ;
 ExplicitLifetime. Lifetime ::= LifetimeDefinition ;

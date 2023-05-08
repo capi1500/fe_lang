@@ -16,7 +16,7 @@ import TypeCheck.Error
 import TypeCheck.Variable
 import Data.List (intercalate)
 import Common.Ast (Expression)
-import Common.InternalFunctions
+import Common.InternalFunctions hiding (makeInternalFunction)
 
 
 type TypeDefinitions = Scope (Map Identifier Type)
@@ -64,8 +64,8 @@ makePreprocessorState = PreprocessorState {
     position = Nothing
 }
 
-makeInternal :: VariableId -> Identifier -> Type -> Variable
-makeInternal id name t = Variable {
+makeInternalFunction :: VariableId -> Identifier -> Type -> Variable
+makeInternalFunction id name t = Variable {
     variableCreatedAt = Nothing,
     variableName = Just name,
     variableType = t,
@@ -75,6 +75,7 @@ makeInternal id name t = Variable {
     variableValue = Value {
         valueCreatedAt = Nothing,
         valueType = t,
+        ownedPlaces = [],
         borrows = [],
         borrowsMut = [],
         owned = True
@@ -83,11 +84,11 @@ makeInternal id name t = Variable {
 }
 
 fromInternals :: [(Identifier, Type, Expression)] -> Variables
-fromInternals names = 
+fromInternals names =
     let zipped = zip names [0..(length names)] in
     Variables
         (Global $ fromList (fmap (\((name, t, _), id) -> (name, id)) zipped))
-        (fmap (\((name, t, _), id) -> makeInternal id name t) zipped)
+        (fmap (\((name, t, _), id) -> makeInternalFunction id name t) zipped)
 
 staticLifetime = Lifetime [0] 1
 

@@ -19,6 +19,7 @@ import Exec.StateFunctions
 import Common.Printer
 import Common.AstPrinter
 import Common.InternalFunctions
+import Common.Utils (listGet)
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -81,7 +82,8 @@ instance Executable Expression Value where
             execute (fromJust maybeOnFalse)
         else do
             return VUnit
-    execute (MakeArrayExpression values) = do
+    execute (MakeArrayExpression expressions) = do
+        values <- traverse execute expressions
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
         return $ VArray pointers
     execute (VariableExpression ident) = do
@@ -94,6 +96,10 @@ instance Executable Expression Value where
         execute e >>= deref
     execute (LiteralExpression value) = do
         return value
+    execute (IndexExpression e1 e2) = do
+        VArray array <- execute e1
+        VI32 index <- execute e2
+        return $ VReference (listGet index array)
     execute (CallExpression function_object params) = do
         VFunction _ code <- execute function_object >>= deref
         params' <- traverse (\(i, e) -> do
@@ -125,8 +131,8 @@ instance Executable Expression Value where
         return $ VBool (not v)
     execute (InternalExpression f) = do
         f
-    -- execute x = do
-    --     throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
+    execute x = do
+        throwError $ Other ("Not yet implemented: " ++ codePrint 0 x)
 
 doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doBooleanDoubleOperator Equals v1 v2 = do

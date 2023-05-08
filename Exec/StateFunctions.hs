@@ -64,7 +64,7 @@ inNewScope f = do
     let mappings = variableMappings state  -- record current state
     putMappings $ Local mappings empty
     ret' <- f
-    put state
+    putMappings mappings
     return ret'
 
 inNewFrame :: ExecutorMonad a -> ExecutorMonad a

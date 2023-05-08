@@ -1,4 +1,5 @@
 module TypeCheck.VariablesUtils where
+
 import Common.Utils
 import TypeCheck.State
 import TypeCheck.Variable
@@ -49,12 +50,6 @@ addVariable :: Identifier -> Mutable -> Value -> PreprocessorMonad VariableId
 addVariable ident mut value = do
     id <- checkShadowing ident
     internalAddVariable (Just ident) mut value Free id
-
-addUninitializedVariable :: Identifier -> Mutable -> Type -> PreprocessorMonad VariableId
-addUninitializedVariable ident mut t = do
-    id <- checkShadowing ident
-    p <- gets position
-    internalAddVariable (Just ident) mut (makeValue p t True) Free id
 
 -- does not change lifetimes, takes it from the environment
 addTemporaryVariable :: Mutable -> Value -> PreprocessorMonad VariableId

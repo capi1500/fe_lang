@@ -33,8 +33,8 @@ instance CodePrint Variables where
   codePrint tabs (Variables _ list) = "[" ++ intercalate ("\n" ++ printTabs tabs) (fmap show list) ++ "]"
 
 instance CodePrint Value where
-    codePrint tabs (Value createdAt t borrows borrowsMut owned) = 
-        "Value {\n" ++ 
+    codePrint tabs (Value createdAt t _ borrows borrowsMut owned) =
+        "Value {\n" ++
         printTabs (tabs + 1) ++ codePrint tabs t ++ "\n" ++
         printTabs (tabs + 1) ++ "borrows: " ++ codePrint tabs borrows ++ "\n" ++
         printTabs (tabs + 1) ++ "borrowsMut: " ++ codePrint tabs borrowsMut ++ "\n" ++

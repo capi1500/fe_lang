@@ -25,7 +25,7 @@ borrow borrowedId = borrowInternal borrowedId markAsBorrowed
         state' <- if state == Free then do
             return $ Borrowed 1 (singleton p)
         else if state == Uninitialized then do
-            throw $ UninitializedVariableUsed p (fromJust (variableName variable))
+            throw $ UninitializedVariableUsed p (variableId variable)
         else if isBorrowed state then do
             let Borrowed borrowedCount borrowPositions = state
             return $ Borrowed (borrowedCount + 1) (insert p borrowPositions)
@@ -77,7 +77,7 @@ moveOut variable = do
         unless (state == Free) $ throw (CannotMoveOut variable)
         let value = variableValue variable
         when (owned value) $ dropValue value
-        setVariableById (variableId variable) (setVariableState Moved variable) 
+        setVariableById (variableId variable) (setVariableState Moved variable)
 
 makeBorrow :: VariableId -> Mutable -> PreprocessorMonad Value
 makeBorrow id mut = do
@@ -90,6 +90,7 @@ makeBorrow id mut = do
         return Value {
             valueCreatedAt = p,
             valueType = TReference Const t,
+            ownedPlaces = [],
             borrows = [id],
             borrowsMut = [],
             owned = True
@@ -99,6 +100,7 @@ makeBorrow id mut = do
         return Value {
             valueCreatedAt = p,
             valueType = TReference Mutable t,
+            ownedPlaces = [],
             borrows = [],
             borrowsMut = [id],
             owned = True
@@ -114,6 +116,7 @@ makeImplicitBorrowValue id mutability = do
 dropValue :: Value -> PreprocessorMonad ()
 dropValue value = do
     addWarning $ Debug ("Dropping " ++ codePrint 1 value)
+    traverse_ moveOutById (ownedPlaces value)
     traverse_ removeBorrow (borrows value)
     traverse_ removeBorrowMut (borrowsMut value)
   where
