@@ -58,11 +58,12 @@ printStringFunction = do
 
 inputI32Function :: ExecutorMonad Value
 inputI32Function = do
+    p <- gets position
     input <- gets input
     let word = head input
     putInput $ tail input
     let x = readMaybe word :: Maybe Int
-    when (isNothing x) $ throwError InputFailed
+    when (isNothing x) $ throwError (InputFailed p)
     return $ VI32 (fromJust x)
 
 inputBoolFunction :: ExecutorMonad Value
@@ -74,8 +75,9 @@ inputBoolFunction = do
         return $ VBool True
     else if word == "false" then do
         return $ VBool False
-    else
-        throwError InputFailed
+    else do
+        p <- gets position
+        throwError (InputFailed p)
 
 inputStringFunction :: ExecutorMonad Value
 inputStringFunction = do

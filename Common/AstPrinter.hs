@@ -17,7 +17,7 @@ instance CodePrint Statement where
 
 instance CodePrint Expression where
     codePrint tabs (BlockExpression statements) = "{\n" ++ intercalate "" (fmap (codePrint (tabs + 1)) statements) ++ printTabs tabs ++ "}\n"
-    codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ")"
+    codePrint tabs (CallExpression _ function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
         codePrint tabs onTrue ++
@@ -27,9 +27,9 @@ instance CodePrint Expression where
     codePrint tabs (VariableExpression ident) = ident
     codePrint tabs (ReferenceExpression ident) = "&" ++ ident
     codePrint tabs (DereferenceExpression e) = "*" ++ codePrint tabs e
-    codePrint tabs (IndexExpression e1 e2) = codePrint tabs e1 ++ "[" ++ codePrint tabs e2 ++ "]"
+    codePrint tabs (IndexExpression _ e1 e2) = codePrint tabs e1 ++ "[" ++ codePrint tabs e2 ++ "]"
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
-    codePrint tabs (I32DoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
+    codePrint tabs (I32DoubleOperatorExpression _ op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (UnaryMinusExpression e) = "-" ++ codePrint tabs e
     codePrint tabs (MakeArrayExpression values) =
         "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"

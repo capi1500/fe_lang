@@ -291,8 +291,8 @@ instance TypeCheck A.Expression TypedExpression where
         dropValue borrowedValue
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         et <- makeValue p returnType False >>= createValueExpression
-        return $ TypedExpression (CallExpression function' params') et
-    typeCheck (A.IndexExpression _ e1 e2) = do
+        return $ TypedExpression (CallExpression p function' params') et
+    typeCheck (A.IndexExpression p e1 e2) = do
         (e1', placeId, mut) <- withinContext $ do
             context <- gets context
             let mut = (case context of
@@ -328,7 +328,7 @@ instance TypeCheck A.Expression TypedExpression where
         (e2', value) <- typeCheckInValueContext e2
 
         f ()
-        let exp = mod2 (IndexExpression (mod1 e1') e2')
+        let exp = mod2 (IndexExpression p (mod1 e1') e2')
         printDebug ("Array indexing `" ++ show e1 ++ "` -> `" ++ codePrint 0 exp)
         return $ TypedExpression exp et
     typeCheck (A.UnaryExpression _ (A.UnaryMinus p) e) = do
@@ -426,7 +426,7 @@ makeI32DoubleOperatorExpression p e1 e2 operator = do
     assertType (hasPosition e1) (valueType v1) i32Type
     assertType (hasPosition e2) (valueType v1) i32Type
     expressionType <- makeValue p i32Type False >>= createValueExpression
-    return $ TypedExpression (I32DoubleOperatorExpression operator e1' e2') expressionType
+    return $ TypedExpression (I32DoubleOperatorExpression p operator e1' e2') expressionType
 
 makeComparisonOperatorExpression :: A.ComparisonOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
 makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
@@ -518,10 +518,12 @@ makeCompoundAssignmentExpression op e1 e2 = do
 
     assertType (hasPosition e1) t1 i32Type
 
-    when (variableState place == Uninitialized) $ throw (UninitializedVariableUsed (hasPosition e1) placeId)
+    let p = hasPosition e1
 
-    et <- makeValue (hasPosition e1) unitType False >>= createValueExpression
-    return $ TypedExpression (AssignmentExpression e1' (I32DoubleOperatorExpression op (DereferenceExpression e1') e2')) et
+    when (variableState place == Uninitialized) $ throw (UninitializedVariableUsed p placeId)
+
+    et <- makeValue p unitType False >>= createValueExpression
+    return $ TypedExpression (AssignmentExpression e1' (I32DoubleOperatorExpression p op (DereferenceExpression e1') e2')) et
 
 instance TypeCheck A.IfExpression TypedExpression where
     typeCheck :: A.IfExpression -> PreprocessorMonad TypedExpression

@@ -20,6 +20,7 @@ import Common.Printer
 import Common.AstPrinter
 import Common.InternalFunctions
 import Common.Utils (listGet)
+import Fe.Abs (BNFC'Position)
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -29,7 +30,7 @@ instance Executable Code () where
     execute (Code statements) = do
         traverse_ (\(name, _, v) -> addVariable name (Variable v)) internals
         traverse_ initializeGlobalScope statements
-        ExecutionState _ mainId _ <- get
+        ExecutionState _ mainId _ _ <- get
         (_, Variable (VFunction _ code)) <- getVariable mainFunction
         execute code :: ExecutorMonad Value
         return ()
@@ -106,11 +107,13 @@ instance Executable Expression Value where
         execute e >>= deref
     execute (LiteralExpression value) = do
         return value
-    execute (IndexExpression e1 e2) = do
+    execute (IndexExpression p e1 e2) = do
         VArray array <- execute e1 >>= deref
         VI32 index <- execute e2
+        unless (0 <= index && index < length array) $ throwError (IndexOutOfRange p index (length array))
         return $ VReference (listGet index array)
-    execute (CallExpression function_object params) = do
+    execute (CallExpression p function_object params) = do
+        putPosition p
         VFunction param_names code <- execute function_object >>= deref
         params' <- traverse (\(i, e) -> do
             x <- execute e
@@ -120,10 +123,10 @@ instance Executable Expression Value where
                 addVariable paramIdent (Variable paramValue))
                 params'
             execute code
-    execute (I32DoubleOperatorExpression operator e1 e2) = do
+    execute (I32DoubleOperatorExpression p operator e1 e2) = do
         v1 <- execute e1
         v2 <- execute e2
-        doNumericDoubleOperator operator v1 v2
+        doNumericDoubleOperator p operator v1 v2
     execute (BoolDoubleOperatorExpression operator e1 e2) = do
         v1 <- execute e1
         v2 <- execute e2
@@ -189,30 +192,30 @@ equals (VReference a) (VReference b) = do
         equals a' b'
 equals _ _ = do return False
 
-doNumericDoubleOperator :: NumericDoubleOperator -> Value -> Value -> ExecutorMonad Value
-doNumericDoubleOperator Plus (VI32 v1) (VI32 v2) = do
+doNumericDoubleOperator :: BNFC'Position -> NumericDoubleOperator -> Value -> Value -> ExecutorMonad Value
+doNumericDoubleOperator _ Plus (VI32 v1) (VI32 v2) = do
     return $ VI32 (v1 + v2)
-doNumericDoubleOperator Minus (VI32 v1) (VI32 v2) = do
+doNumericDoubleOperator _ Minus (VI32 v1) (VI32 v2) = do
     return $ VI32 (v1 - v2)
-doNumericDoubleOperator Multiply (VI32 v1) (VI32 v2) = do
+doNumericDoubleOperator _ Multiply (VI32 v1) (VI32 v2) = do
     return $ VI32 (v1 * v2)
-doNumericDoubleOperator Divide (VI32 v1) (VI32 v2) = do
-    when (v2 == 0) $ throwError (DivisionByZero (Just (0, 0))) -- TODO: fix error handling
+doNumericDoubleOperator p Divide (VI32 v1) (VI32 v2) = do
+    when (v2 == 0) $ throwError (DivisionByZero p)
     return $ VI32 (div v1 v2)
-doNumericDoubleOperator Modulo (VI32 v1) (VI32 v2) = do
-    when (v2 == 0) $ throwError (DivisionByZero (Just (0, 0))) -- TODO: fix error handling
+doNumericDoubleOperator p Modulo (VI32 v1) (VI32 v2) = do
+    when (v2 == 0) $ throwError (DivisionByZero p)
     return $ VI32 (mod v1 v2)
-doNumericDoubleOperator LShift (VI32 v1) (VI32 v2) = do
-    when (v2 < 0 || v2 >= finiteBitSize v2) $ throwError (ShiftInvalidArgument v2) -- TODO: fix error handling
+doNumericDoubleOperator p LShift (VI32 v1) (VI32 v2) = do
+    when (v2 < 0 || v2 >= finiteBitSize v2) $ throwError (ShiftInvalidArgument p v2)
     return $ VI32 (shiftL v1 v2)
-doNumericDoubleOperator RShift (VI32 v1) (VI32 v2) = do
-    when (v2 < 0 || v2 >= finiteBitSize v2) $ throwError (ShiftInvalidArgument v2) -- TODO: fix error handling
+doNumericDoubleOperator p RShift (VI32 v1) (VI32 v2) = do
+    when (v2 < 0 || v2 >= finiteBitSize v2) $ throwError (ShiftInvalidArgument p v2)
     return $ VI32 (shiftR v1 v2)
-doNumericDoubleOperator BitOr (VI32 v1) (VI32 v2) = do
+doNumericDoubleOperator _ BitOr (VI32 v1) (VI32 v2) = do
     return $ VI32 (v1 .|. v2)
-doNumericDoubleOperator BitXor (VI32 v1) (VI32 v2) = do
+doNumericDoubleOperator _ BitXor (VI32 v1) (VI32 v2) = do
     return $ VI32 (xor v1 v2)
-doNumericDoubleOperator BitAnd (VI32 v1) (VI32 v2) = do
+doNumericDoubleOperator _ BitAnd (VI32 v1) (VI32 v2) = do
     return $ VI32 (v1 .&. v2)
-doNumericDoubleOperator op v1 v2 = do
+doNumericDoubleOperator _ op v1 v2 = do
     throwError $ TypeCheckerFailed (codePrint 0 v1 ++ " " ++ show op ++ " " ++ codePrint 0 v2)

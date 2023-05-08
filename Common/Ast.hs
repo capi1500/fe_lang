@@ -13,7 +13,7 @@ import Common.Printer
 import Common.Scope
 
 import Exec.Error
-import Fe.Abs (Expression'(WhileExpression))
+import Fe.Abs (BNFC'Position)
 
 mainFunction :: Identifier
 mainFunction =  "main"
@@ -24,7 +24,8 @@ type VariableMappings = Scope (Map Identifier Pointer)
 data ExecutionState = ExecutionState {
     variableMappings :: VariableMappings,
     variables :: [Variable],
-    input :: [String]
+    input :: [String],
+    position :: BNFC'Position
 }
 
 type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a
@@ -61,12 +62,12 @@ data Expression =
     -- ArrayExpressionDefault Expression Expression |
     -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
-    CallExpression Expression [Expression] | -- ident, is_reference, expression
-    IndexExpression Expression Expression |
+    CallExpression BNFC'Position Expression [Expression] | -- ident, is_reference, expression
+    IndexExpression BNFC'Position Expression Expression |
     UnaryMinusExpression Expression |
     UnaryNegationExpression Expression |
     -- TypeCastExpression Expression (Type) |
-    I32DoubleOperatorExpression NumericDoubleOperator Expression Expression |
+    I32DoubleOperatorExpression BNFC'Position NumericDoubleOperator Expression Expression |
     BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression |
     -- LazyAndExpression Expression Expression |
     -- LazyOrExpression Expression Expression |
