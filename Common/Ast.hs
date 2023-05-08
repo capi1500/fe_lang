@@ -13,6 +13,7 @@ import Common.Printer
 import Common.Scope
 
 import Exec.Error
+import Fe.Abs (Expression'(WhileExpression))
 
 mainFunction :: Identifier
 mainFunction =  "main"
@@ -44,6 +45,7 @@ data Initialization = VarInitialized Expression | VarUninitialized
 data Expression =
     BlockExpression [Statement] |
     IfExpression Expression Expression (Maybe Expression) | -- condition onTrue [onFalse]
+    WhileExpression Expression Expression | -- condition, block
     -- WhileExpression Expression Expression |
     -- ForExpression Pattern Expression Expression |
     -- MatchExpression Expression [MatchArm]

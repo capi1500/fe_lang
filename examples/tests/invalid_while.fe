@@ -1,0 +1,9 @@
+fn main() {
+	var i = 0;
+	var a = 100;
+	var x = &a;
+	while (i < 10) {
+		print_i32(*x);
+		i = i + 1;
+	}
+}

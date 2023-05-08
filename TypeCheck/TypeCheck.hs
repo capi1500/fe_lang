@@ -226,6 +226,18 @@ instance TypeCheck A.Expression TypedExpression where
         typeCheck expression
     typeCheck (A.IfExpression p ifExpression) = do
         typeCheck ifExpression
+    typeCheck (A.WhileExpression p condition block) = do
+        condition' <- do
+            (condition', conditionValue) <- typeCheckInValueContext condition
+            assertType (hasPosition condition) (valueType conditionValue) boolType
+            return condition'
+        addWarning $ Debug "First while"
+        (block', blockValue) <- typeCheckInValueContext block
+        -- TODO: should disable warnings, but not errors
+        addWarning $ Debug "Second while"
+        (block', blockValue) <- typeCheckInValueContext block -- check if block can be executed multiple times (so no move happens inside etc.)
+        et <- makeValue p unitType False >>= createValueExpression
+        return $ TypedExpression (WhileExpression condition' block') et
     typeCheck (A.VariableExpression p (A.Ident name)) = do
         putPosition p
         context <- gets context

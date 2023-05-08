@@ -22,6 +22,7 @@ instance CodePrint Expression where
         "if (" ++ codePrint tabs condition ++ ") " ++
         codePrint tabs onTrue ++
         maybe "" (\onFalse -> "\n" ++ printTabs tabs ++ "else " ++ codePrint tabs onFalse) maybeOnFalse
+    codePrint tabs (WhileExpression condition block) = "while (" ++ codePrint tabs condition ++ ") " ++ codePrint tabs block
     codePrint tabs (LiteralExpression value) = codePrint tabs value
     codePrint tabs (VariableExpression ident) = ident
     codePrint tabs (ReferenceExpression ident) = "&" ++ ident

@@ -59,6 +59,7 @@ reproduceWithPersistent state = do
     LifetimeState _ id <- gets lifetimeState
 
     put state
+    putVariables variables
 
     LifetimeState lifetime _ <- gets lifetimeState
     putWarnings warnings

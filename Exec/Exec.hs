@@ -82,6 +82,13 @@ instance Executable Expression Value where
             execute (fromJust maybeOnFalse)
         else do
             return VUnit
+    execute (WhileExpression condition block) = do
+        VBool bool <- execute condition
+        if bool then do
+            execute block :: ExecutorMonad Value
+            execute $ WhileExpression condition block
+        else do
+            return VUnit
     execute (MakeArrayExpression expressions) = do
         values <- traverse execute expressions
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
