@@ -12,10 +12,14 @@ import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.Variable
 
+
+printDebug str = do
+    when debug $ addWarning $ Debug str
+
 printVariables :: PreprocessorMonad ()
 printVariables = do
     Variables _ variables <- gets variables
-    addWarning $ Debug ("Variables: [\n" ++
+    printDebug ("Variables: [\n" ++
         intercalate ",\n"
             (fmap
                 (\v -> printTabs 1 ++ codePrint 2 v)

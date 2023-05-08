@@ -6,8 +6,10 @@ fn print_row(row: &mut [i32], size: i32) {
 	var i = 0;
 	while (i < size) {
 		print_i32(row[i]);
+		print_string("\t");
 		i += 1;
 	}
+	print_char('\n');
 }
 
 fn insert_row(row: &mut [i32], size: i32) {

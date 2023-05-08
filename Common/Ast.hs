@@ -24,7 +24,7 @@ type VariableMappings = Scope (Map Identifier Pointer)
 data ExecutionState = ExecutionState {
     variableMappings :: VariableMappings,
     variables :: [Variable],
-    input :: String
+    input :: [String]
 }
 
 type ExecutorMonad a = StateT ExecutionState (ExceptT ExecutionError IO) a

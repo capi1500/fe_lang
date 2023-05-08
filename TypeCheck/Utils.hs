@@ -21,6 +21,7 @@ import TypeCheck.Error
 import TypeCheck.Variable
 import TypeCheck.VariablesUtils
 import TypeCheck.LifetimeUtils
+import TypeCheck.Printer
 
 assertType :: BNFC'Position -> Type -> Type -> PreprocessorMonad ()
 assertType p actualType expectedType = do
@@ -102,7 +103,7 @@ nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
 
 stripReferences :: Value -> PreprocessorMonad (Expression -> Expression, Value)
 stripReferences value = do
-    addWarning $ Debug ("Strip reference of " ++ codePrint 0 (valueType value))
+    printDebug ("Strip reference of " ++ codePrint 0 (valueType value))
     helper (valueType value) value
     where
         helper (TReference _ t) value = do

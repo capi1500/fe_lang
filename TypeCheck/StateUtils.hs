@@ -18,6 +18,7 @@ import TypeCheck.Error
 import TypeCheck.State
 import TypeCheck.Variable
 import TypeCheck.BorrowCheckerUtils
+import TypeCheck.Printer
 
 makeNewFrame :: Variables -> Variables
 makeNewFrame (Variables (Global global) variables) = Variables (Local (Global global) empty) variables
@@ -74,7 +75,6 @@ withinContext f = do
 
 endStatement :: PreprocessorMonad ()
 endStatement = do
-    addWarning $ Debug "Ending statement"
     toDrop <- gets toDropAtStatementEnd
     traverse_ moveOutById toDrop
     clearVariablesToDrop

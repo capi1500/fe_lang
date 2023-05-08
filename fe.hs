@@ -87,7 +87,7 @@ printWarnings state = do
 executeStage :: PreprocessorOutput -> IO ()
 executeStage code = do
     input <- getContents
-    out <- runExceptT $ runStateT (execute code) (makeExecutionState input)
+    out <- runExceptT $ runStateT (execute code) (makeExecutionState (words input))
     handleExecutionError out
     return ()
 

@@ -72,7 +72,7 @@ internalAddVariable identifier mut value variableState id = do
         lifetime = lifetime
     }
     x <- helper identifier variable variables id
-    -- addWarning $ Debug ("Adding variable " ++ show identifier ++ " at " ++ show p)
+    -- printDebug ("Adding variable " ++ show identifier ++ " at " ++ show p)
     -- printVariables
     return x
   where

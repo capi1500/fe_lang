@@ -7,7 +7,7 @@ import Control.Monad.State
 import Common.Scope
 import Common.Ast
 
-makeExecutionState :: String -> ExecutionState
+makeExecutionState :: [String] -> ExecutionState
 makeExecutionState = ExecutionState (Global empty) []
 
 putMappings :: VariableMappings -> ExecutorMonad ()
@@ -18,4 +18,9 @@ putMappings mappings = do
 putVariables :: [Variable] -> ExecutorMonad ()
 putVariables variables = do
     ExecutionState mappings _ input <- get
+    put $ ExecutionState mappings variables input
+
+putInput :: [String] -> ExecutorMonad ()
+putInput input = do
+    ExecutionState mappings variables _ <- get
     put $ ExecutionState mappings variables input

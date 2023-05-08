@@ -14,6 +14,7 @@ import TypeCheck.VariablesUtils
 import Text.XHtml (variable)
 import Data.Maybe
 import Common.Printer
+import TypeCheck.Printer
 
 borrow :: VariableId -> PreprocessorMonad ()
 borrow borrowedId = borrowInternal borrowedId markAsBorrowed
@@ -69,7 +70,7 @@ moveOutById variableId = do
 moveOut :: Variable -> PreprocessorMonad ()
 moveOut variable = do
     p <- gets position
-    addWarning $ Debug ("Moving out " ++ codePrint 1 variable ++ " at " ++ show p)
+    printDebug ("Moving out " ++ codePrint 1 variable ++ " at " ++ show p)
     let state = variableState variable
     if state == Moved then do
         return ()
@@ -112,28 +113,28 @@ makeBorrow id mut = do
 makeImplicitBorrowValue :: VariableId -> Mutable -> PreprocessorMonad Value
 makeImplicitBorrowValue id mutability = do
     value <- makeBorrow id mutability
-    addWarning $ Debug ("implicit borrow of " ++ show id)
+    printDebug ("implicit borrow of " ++ show id)
     return (setValueOwned False value)
 
 dropValue :: Value -> PreprocessorMonad ()
 dropValue value = do
-    addWarning $ Debug ("Dropping " ++ codePrint 1 value)
+    printDebug ("Dropping " ++ codePrint 1 value)
     traverse_ moveOutById (ownedPlaces value)
     traverse_ removeBorrow (borrows value)
     traverse_ removeBorrowMut (borrowsMut value)
   where
     removeBorrow :: VariableId -> PreprocessorMonad ()
     removeBorrow borrowedId = do
-        addWarning $ Debug ("    Removing borrow of " ++ show borrowedId ++ " (at " ++ show (valueCreatedAt value) ++ ")")
+        printDebug ("    Removing borrow of " ++ show borrowedId ++ " (at " ++ show (valueCreatedAt value) ++ ")")
         variable <- getVariableById borrowedId
         let Borrowed borrowersCount borrowPositions = variableState variable
         let state' = if borrowersCount == 1 then Free
                 else Borrowed (borrowersCount - 1) (delete (valueCreatedAt value) borrowPositions)
-        addWarning $ Debug ("   New variable state " ++ show state')
+        printDebug ("   New variable state " ++ show state')
         setVariableById borrowedId (setVariableState state' variable)
         return ()
     removeBorrowMut :: VariableId -> PreprocessorMonad ()
     removeBorrowMut borrowedId = do
-        addWarning $ Debug ("    Removing mutable borrow of " ++ show borrowedId)
+        printDebug ("    Removing mutable borrow of " ++ show borrowedId)
         mutateVariableById borrowedId (setVariableState Free)
         return ()

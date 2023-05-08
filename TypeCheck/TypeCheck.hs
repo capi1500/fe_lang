@@ -99,13 +99,13 @@ instance TypeCheck A.Statement Statement where
         scope <- gets typeDefinitions
         unless (isGlobal scope) $ do addToScope item
         statement <- typeCheck item
-        printVariables
+        -- printVariables
         endStatement
         return statement
     typeCheck (A.ExpressionStatement p expression) = do
         putPosition p
         (expression', value) <- typeCheckInValueContext expression
-        printVariables
+        -- printVariables
         dropValue value
         endStatement
         return (ExpressionStatement expression')
@@ -229,10 +229,10 @@ instance TypeCheck A.Expression TypedExpression where
             (condition', conditionValue) <- typeCheckInValueContext condition
             assertType (hasPosition condition) (valueType conditionValue) boolType
             return condition'
-        addWarning $ Debug "First while"
+        printDebug "First while"
         (block', blockValue) <- typeCheckInValueContext block
         -- TODO: should disable warnings, but not errors
-        addWarning $ Debug "Second while"
+        printDebug "Second while"
         (block', blockValue) <- typeCheckInValueContext block -- check if block can be executed multiple times (so no move happens inside etc.)
         et <- makeValue p unitType False >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
@@ -283,7 +283,7 @@ instance TypeCheck A.Expression TypedExpression where
             printVariables
             (paramExpression, paramValue) <- typeCheckInValueContext param
             assertType (hasPosition param) (valueType paramValue) paramDeclaredType
-            addWarning $ Debug ("Passing value: " ++ codePrint 1 paramValue)
+            printDebug ("Passing value: " ++ codePrint 1 paramValue)
             dropValue paramValue -- TODO: for now, drop, transfer to return value when allowing for explicit lifetimes
             return paramExpression
 
@@ -329,7 +329,7 @@ instance TypeCheck A.Expression TypedExpression where
 
         f ()
         let exp = mod2 (IndexExpression (mod1 e1') e2')
-        addWarning $ Debug ("Array indexing `" ++ show e1 ++ "` -> `" ++ codePrint 0 exp)
+        printDebug ("Array indexing `" ++ show e1 ++ "` -> `" ++ codePrint 0 exp)
         return $ TypedExpression exp et
     typeCheck (A.UnaryExpression _ (A.UnaryMinus p) e) = do
         e' <- do
@@ -358,7 +358,7 @@ instance TypeCheck A.Expression TypedExpression where
             return (e', placeId, mutability)
 
         borrowedVariable <- getVariableById placeId
-        addWarning $ Debug ("Attempting to deref " ++ codePrint 1 borrowedVariable)
+        printDebug ("Attempting to deref " ++ codePrint 1 borrowedVariable)
 
         let t = variableType borrowedVariable
         unless (isReference t) $ throw (CannotDerefNotReference p t)
@@ -542,7 +542,7 @@ ifExpression p condition onTrue onFalse = do
     -- need to preserve state of variables before onTrue and onFalse. Then merge them
     (onTrue', onTrueValue) <- do
         (onTrue', onTrueValue) <- typeCheckInValueContext onTrue
-        -- addWarning $ Debug "onTrue"
+        -- printDebug "onTrue"
         -- printVariables
         return (onTrue', onTrueValue)
     let onTrueType = valueType onTrueValue
@@ -553,7 +553,7 @@ ifExpression p condition onTrue onFalse = do
             return (Nothing, value)
         else do
             (onFalse', onFalseValue) <- typeCheckInValueContext (fromJust onFalse)
-            -- addWarning $ Debug "onFalse"
+            -- printDebug "onFalse"
             -- printVariables
             return (Just onFalse', onFalseValue)
     let onFalseType = valueType onFalseValue

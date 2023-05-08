@@ -11,6 +11,8 @@ import Common.Scope
 import TypeCheck.Variable
 import Common.Printer
 
+debug = False
+
 data PreprocessorError =
     TypeAlreadyInScope BNFC'Position Identifier Type Type | -- ident, new definition, old definition
     TypeNotDefined BNFC'Position Identifier |
