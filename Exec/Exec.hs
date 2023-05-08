@@ -31,8 +31,7 @@ instance Executable Code () where
         traverse_ initializeGlobalScope statements
         ExecutionState _ mainId _ <- get
         (_, Variable (VFunction _ code)) <- getVariable mainFunction
-        x <- execute code :: ExecutorMonad Value
-        liftIO (putStrLn $ codePrint 0 x)
+        execute code :: ExecutorMonad Value
         return ()
 
 initializeGlobalScope :: Statement -> ExecutorMonad ()
@@ -50,16 +49,13 @@ instance Executable Statement Value where
     execute (NewVariableStatement ident initialization) = do
         value <- execute initialization
         addVariable ident value
-        printLocalScope
         return VUnit
-    execute (NewFunctionStatement ident expression paramIdents) = do
-        let value = Variable $ VFunction paramIdents expression
+    execute (NewFunctionStatement ident expression paramNames) = do
+        let value = Variable $ VFunction paramNames expression
         addVariable ident value
         return VUnit
     execute (ExpressionStatement expression) = do
-        value <- execute expression
-        printLocalScope
-        return value
+        execute expression
 
 instance Executable Initialization Variable where
     execute :: Initialization -> ExecutorMonad Variable

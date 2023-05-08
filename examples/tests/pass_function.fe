@@ -1,5 +1,5 @@
 fn adder(x: &mut i32) {
-	*x = *x + 1;
+	*x += 1;
 }
 
 fn applier1(f: Fn(&mut i32), a: &mut i32) {

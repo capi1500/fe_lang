@@ -497,7 +497,6 @@ makeAssignmentExpression (A.Assign p) e1 e2 = do
 
     assertType p t1 t2
 
-    -- is it ever uninitialized here? Or always borrowed?
     when (variableState place == Uninitialized) $ mutateVariableById placeId (setVariableState Free)
     mutateVariableById placeId (mutateVariableValue (const newValue))
     printVariables
@@ -507,10 +506,22 @@ makeAssignmentExpression (A.Assign p) e1 e2 = do
 
 makeCompoundAssignmentExpression :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
 makeCompoundAssignmentExpression op e1 e2 = do
-    throw $ Other "Compound assignment not yet implemented" (hasPosition e1)
-    -- TypedExpression e1' t _ <- typeCheck e1
-    -- TypedExpression e2' t _ <- typeCheck e2
-    -- return $ TypedExpression (AssignmentExpression False e1' (I32DoubleOperatorExpression op e1' e2')) unitType staticLifetime
+    (e2', modifyingValue) <- typeCheckInValueContext e2
+    let t2 = valueType modifyingValue
+
+    assertType (hasPosition e2) t2 i32Type
+
+    (e1', placeId) <- typeCheckInPlaceContext Mutable e1
+    place <- getVariableById placeId
+    let t1 = variableType place
+    dropValue (variableValue place)
+
+    assertType (hasPosition e1) t1 i32Type
+
+    when (variableState place == Uninitialized) $ throw (UninitializedVariableUsed (hasPosition e1) placeId)
+
+    et <- makeValue (hasPosition e1) unitType False >>= createValueExpression
+    return $ TypedExpression (AssignmentExpression e1' (I32DoubleOperatorExpression op (DereferenceExpression e1') e2')) et
 
 instance TypeCheck A.IfExpression TypedExpression where
     typeCheck :: A.IfExpression -> PreprocessorMonad TypedExpression
