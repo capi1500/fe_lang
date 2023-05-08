@@ -142,6 +142,7 @@ fn p() {
 }
 
 fn r1(a: &mut i32) {
+	// a = 4; invalid
 	*a = 4;
 	println!("{}", a);
 }
@@ -150,6 +151,19 @@ fn r2() {
 	let mut a = 1;
 	r1(&mut a);
 	println!("{}", a);
+}
+
+fn q1(a: &mut [i32]) {
+	//a = [4,5,6]; // invalid
+	a[1] = 5;
+	a[2] = 6;
+	println!("{:?}", a);
+}
+
+fn q2() {
+	let mut a = [1, 2, 3];
+	q1(&mut a);
+	println!("{:?}", a);
 }
 
 fn main() {

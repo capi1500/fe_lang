@@ -91,8 +91,10 @@ instance Executable Expression Value where
         return $ VArray pointers
     execute (MakeArrayDefaultsExpression e1 e2) = do
         VI32 size <- execute e1
-        value <- execute e2
-        pointers <- traverse (\id -> do addTmpVariable (Variable value)) [1..size]
+        pointers <- traverse (\id -> do
+            value <- execute e2
+            addTmpVariable (Variable value)
+            ) [1..size]
         return $ VArray pointers
     execute (VariableExpression ident) = do
         (_, Variable value) <- getVariable ident

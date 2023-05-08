@@ -16,7 +16,7 @@ instance CodePrint Statement where
     codePrint tabs (ExpressionStatement expr) = printTabs tabs ++ codePrint tabs expr
 
 instance CodePrint Expression where
-    codePrint tabs (BlockExpression statements) = "{\n" ++ intercalate "" (fmap (codePrint (tabs + 1)) statements) ++ "\n" ++ printTabs tabs ++ "}"
+    codePrint tabs (BlockExpression statements) = "{\n" ++ intercalate "" (fmap (codePrint (tabs + 1)) statements) ++ printTabs tabs ++ "}\n"
     codePrint tabs (CallExpression function params) = codePrint tabs function ++ "(" ++ intercalate ", " (fmap (codePrint tabs) params) ++ ")"
     codePrint tabs (IfExpression condition onTrue maybeOnFalse) =
         "if (" ++ codePrint tabs condition ++ ") " ++
@@ -43,7 +43,7 @@ instance CodePrint Value where
     codePrint _ (VBool b) = show b
     codePrint _ VUnit = "()"
     codePrint _ (VReference ptr) = "ptr(" ++ show ptr ++ ")"
-    codePrint _ (VArray _) = "[" ++ "<internal>" ++ "]"
+    codePrint tabs (VArray lst) = "[" ++ intercalate ", " (fmap (\x -> "ptr(" ++ codePrint tabs x ++ ")") lst) ++ "]"
     codePrint _ _ = "<internal>"
 
 instance CodePrint BooleanDoubleOperator where

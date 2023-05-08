@@ -5,11 +5,12 @@ import Exec.State
 import Exec.StateFunctions (getVariableById)
 import Common.Scope
 import Control.Monad.State
-import Data.Map (toList)
+import Data.Map (toList, Map)
 import Fe.Abs (Ident(..))
 import Common.Printer
 import Common.AstPrinter
 import Data.List (intercalate, sortBy)
+import Common.Utils
 
 valueOfBlock :: [Value] -> Value
 valueOfBlock statements =
@@ -49,13 +50,26 @@ instance CodePrint Variable where
 printLocalScope :: ExecutorMonad ()
 printLocalScope = do
     mappings <- gets variableMappings
-    vars <- traverse (\(ident, id) -> do
-        x <- getVariableById id
-        return $ "    " ++ show id ++ ": " ++ ident ++ " = " ++ codePrint 1 x ++ "\n")
-        (sortBy (\(_, id1) (_, id2) -> compare id1 id2) (toList (helper mappings)))
-
-    let string = "Local scope: [\n" ++ intercalate "" vars ++ "]" 
-    liftIO $ putStrLn string
+    printScope (helper mappings)
   where
     helper (Global map) = map
     helper (Local _ map) = map
+
+printScope :: Map Identifier Pointer -> ExecutorMonad ()
+printScope map = do
+    vars <- traverse (\(ident, id) -> do
+        x <- getVariableById id
+        return $ "    " ++ show id ++ ": " ++ ident ++ " = " ++ codePrint 1 x ++ "\n")
+        (sortBy (\(_, id1) (_, id2) -> compare id1 id2) (toList map))
+    liftIO $ putStrLn (intercalate "" vars)
+
+printVariables :: ExecutorMonad ()
+printVariables = do
+    mappings <- gets variableMappings
+    helper mappings
+  where
+    helper (Global map) = do
+        printScope map
+    helper (Local parent map) = do
+        helper parent
+        printScope map

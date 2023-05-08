@@ -99,14 +99,14 @@ instance TypeCheck A.Statement Statement where
         scope <- gets typeDefinitions
         unless (isGlobal scope) $ do addToScope item
         statement <- typeCheck item
-        printVariables
+        -- printVariables
         endStatement
         return statement
     typeCheck (A.ExpressionStatement p expression) = do
         putPosition p
         (expression', value) <- typeCheckInValueContext expression
 
-        printVariables
+        -- printVariables
 
         dropValue value
         endStatement
@@ -204,7 +204,7 @@ instance TypeCheck A.Expression TypedExpression where
                                 putPosition p
                                 (expression', blockValue) <- typeCheckInValueContext expression
 
-                                printVariables
+                                -- printVariables
 
                                 endStatement
                                 return (ExpressionStatement expression', blockValue)
@@ -305,25 +305,33 @@ instance TypeCheck A.Expression TypedExpression where
             let PlaceType _ placeId = et
             return (e', placeId, mut)
 
-        borrow <- makeImplicitBorrowValue placeId mut
+        place <- getVariableById placeId
+        -- Just as with methods, Rust will also insert dereference operations on a repeatedly to find an implementation. AKA remember the dereference level, AKA don't borrow if it's a reference
+        (mod1, arrayValue) <- stripReferences (variableValue place)
+        let t = valueType arrayValue
 
-        (e2', value) <- typeCheckInValueContext e2
-
-        array <- getVariableById placeId
-        let t = variableType array
+        f <- if isArray (variableType place) then do
+                borrow <- makeImplicitBorrowValue placeId mut
+                return (\() -> dropValue borrow)
+            else do
+                return (\() -> return ())
         unless (isArray t) $ throw (TypeNotIndexable (hasPosition e1) t)
         let TArray innerT = t
 
-        let indexPlaceId = head $ ownedPlaces (variableValue array)
+        let indexPlaceId = head $ ownedPlaces arrayValue
         et <- createPlaceExpression indexPlaceId
-        dropValue borrow
 
         context <- gets context
-        let mod = case context of
+        let mod2 = case context of
               PlaceContext _ -> id
               ValueContext -> DereferenceExpression
 
-        return $ TypedExpression (mod (IndexExpression e1' e2')) et
+        (e2', value) <- typeCheckInValueContext e2
+
+        f ()
+        let exp = mod2 (IndexExpression (mod1 e1') e2')
+        addWarning $ Debug ("Array indexing `" ++ show e1 ++ "` -> `" ++ codePrint 0 exp)
+        return $ TypedExpression exp et
     typeCheck (A.UnaryExpression _ (A.UnaryMinus p) e) = do
         e' <- do
             (e', v) <- typeCheckInValueContext e
@@ -356,14 +364,7 @@ instance TypeCheck A.Expression TypedExpression where
         let t = variableType borrowedVariable
         unless (isReference t) $ throw (CannotDerefNotReference p t)
 
-        let borrowedValue = variableValue borrowedVariable
-        let borrows' = borrows borrowedValue
-        let borrowsMut' = borrowsMut borrowedValue
-
-        let derefedPlaceId = if null borrows' then
-                head borrowsMut'
-            else
-                head borrows'
+        let derefedPlaceId = deref (variableValue borrowedVariable)
 
         context <- gets context
         if isValueContext context then do
@@ -435,7 +436,7 @@ makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
 
-    printVariables
+    -- printVariables
     assertType p (valueType v1) (valueType v2)
 
     let TReference _ innerT = valueType v1
@@ -465,14 +466,14 @@ makeI32ComparisonExpression e1 e2 operator = do
     v1 <- makeImplicitBorrowValue id1 Const
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
-    printVariables
+    -- printVariables
 
     assertType (hasPosition e1) (valueType v1) (TReference Const i32Type) -- here its a reference to int vs int
     assertType (hasPosition e2) (valueType v2) (TReference Const i32Type)
     expressionType <- makeValue (hasPosition e1) boolType False >>= createValueExpression
     dropValue v1
     dropValue v2
-    printVariables
+    -- printVariables
     return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') expressionType
 
 makeAssignmentExpression :: A.AssignmentOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
@@ -499,7 +500,7 @@ makeAssignmentExpression (A.Assign p) e1 e2 = do
 
     when (variableState place == Uninitialized) $ mutateVariableById placeId (setVariableState Free)
     mutateVariableById placeId (mutateVariableValue (const newValue))
-    printVariables
+    -- printVariables
 
     et <- makeValue (hasPosition e1) unitType False >>= createValueExpression
     return $ TypedExpression (AssignmentExpression e1' e2') et
@@ -541,8 +542,8 @@ ifExpression p condition onTrue onFalse = do
 
     (onTrue', onTrueValue) <- do
         (onTrue', onTrueValue) <- typeCheckInValueContext onTrue
-        addWarning $ Debug "onTrue"
-        printVariables
+        -- addWarning $ Debug "onTrue"
+        -- printVariables
         return (onTrue', onTrueValue)
     let onTrueType = valueType onTrueValue
 
@@ -552,8 +553,8 @@ ifExpression p condition onTrue onFalse = do
             return (Nothing, value)
         else do
             (onFalse', onFalseValue) <- typeCheckInValueContext (fromJust onFalse)
-            addWarning $ Debug "onFalse"
-            printVariables
+            -- addWarning $ Debug "onFalse"
+            -- printVariables
             return (Just onFalse', onFalseValue)
     let onFalseType = valueType onFalseValue
 

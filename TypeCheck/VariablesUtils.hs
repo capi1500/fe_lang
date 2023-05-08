@@ -72,8 +72,8 @@ internalAddVariable identifier mut value variableState id = do
         lifetime = lifetime
     }
     x <- helper identifier variable variables id
-    addWarning $ Debug ("Adding variable " ++ show identifier ++ " at " ++ show p)
-    printVariables
+    -- addWarning $ Debug ("Adding variable " ++ show identifier ++ " at " ++ show p)
+    -- printVariables
     return x
   where
     helper ident variable (Variables (Global mappings) variables) maybeId = do

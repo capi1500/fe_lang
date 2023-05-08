@@ -8,7 +8,7 @@ import Control.Monad.State
 
 import qualified Fe.Abs as A
 
-import Common.Ast
+import Common.Ast hiding (Value)
 import Common.Types
 import Common.Utils
 import Common.Scope
@@ -77,7 +77,6 @@ getShortestLifetime p variables = do
             else
                 (l2, p2)
 
-
 getShorterOfLifetimesOrThrow :: A.BNFC'Position -> A.BNFC'Position -> Lifetime -> Lifetime -> PreprocessorMonad Lifetime
 getShorterOfLifetimesOrThrow p1 p2 first second = do
     if isSubLifetime first second then
@@ -100,3 +99,24 @@ nameOfItem (A.ItemFunction _ (A.Ident ident) _ _ _ _) = ident
 nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariant _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
+
+stripReferences :: Value -> PreprocessorMonad (Expression -> Expression, Value)
+stripReferences value = do
+    addWarning $ Debug ("Strip reference of " ++ codePrint 0 (valueType value))
+    helper (valueType value) value
+    where
+        helper (TReference _ t) value = do
+            variable <- getVariableById (deref value)
+            (e, v) <- stripReferences (variableValue variable)
+            return (DereferenceExpression . e, v)
+        helper t value = return (id, value)
+
+
+deref :: Value -> VariableId
+deref borrowedValue =
+    let borrows' = borrows borrowedValue in
+    let borrowsMut' = borrowsMut borrowedValue in
+    if null borrows' then
+            head borrowsMut'
+        else
+            head borrows'
