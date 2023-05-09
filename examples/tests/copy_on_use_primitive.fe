@@ -1,6 +1,6 @@
-fn main() -> i32 {
+fn main() {
     var x = 5;
     var y = x + 1;
     var z = x;
-    y + y + z + z
+    print_i32(y + y + z * 2);
 }

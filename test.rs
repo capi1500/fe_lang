@@ -182,6 +182,12 @@ fn s2() {
 	println!("{:?} {:?} {:?}", r, x, y);
 }
 
+fn t() {
+	let x = 5;
+	let y = &x;
+	println!("{}", 3 + y);
+}
+
 fn main() {
 	s2();
 }

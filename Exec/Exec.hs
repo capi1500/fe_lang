@@ -23,7 +23,8 @@ import Common.InternalFunctions
 import Common.Utils (listGet)
 import Fe.Abs (BNFC'Position)
 import Control.Exception
-import GHC.IO (catchAny)
+import GHC.IO (catchAny, liftIO)
+import Prelude hiding (print)
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -66,24 +67,24 @@ instance Executable Initialization Variable where
     execute VarUninitialized = do
         return Uninitialized
     execute (VarInitialized expression) = do
-        expression' <- execute expression
+        expression' <- execute expression >>= varValue
         return $ Variable expression'
 
 instance Executable Expression Value where
     execute :: Expression -> ExecutorMonad Value
     execute (BlockExpression statements) = do
-        values <- traverse execute statements
+        values <- traverse (\x -> do execute x >>= varValue) statements
         deref (valueOfBlock values)
     execute (IfExpression condition onTrue maybeOnFalse) = do
-        VBool bool <- execute condition
+        VBool bool <- execute condition >>= varValue
         if bool then do
-            execute onTrue
+            execute onTrue >>= varValue
         else if isJust maybeOnFalse then do
-            execute (fromJust maybeOnFalse)
+            execute (fromJust maybeOnFalse) >>= varValue
         else do
             return VUnit
     execute (WhileExpression condition block) = do
-        VBool bool <- execute condition
+        VBool bool <- execute condition >>= varValue
         if bool then do
             x <- do {
                 execute block :: ExecutorMonad Value;
@@ -100,36 +101,40 @@ instance Executable Expression Value where
             handler Continue = return True
             handler x = throwError x
     execute (MakeArrayExpression expressions) = do
-        values <- traverse execute expressions
+        values <- traverse (\x -> do execute x >>= varValue) expressions
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
         return $ VArray pointers
     execute (MakeArrayDefaultsExpression e1 e2) = do
         VI32 size <- execute e1
         pointers <- traverse (\id -> do
-            value <- execute e2
+            value <- execute e2 >>= varValue
             addTmpVariable (Variable value)
             ) [1..size]
         return $ VArray pointers
     execute (VariableExpression ident) = do
-        (_, Variable value) <- getVariable ident
-        return value
-    execute (ReferenceExpression ident) = do
-        (pointer, _) <- getVariable ident
-        return $ VReference pointer
+        (pointer, variable) <- getVariable ident
+        return $ VVariable pointer variable
+    execute (ReferenceExpression e) = do
+        VVariable pointer _ <- execute e
+        let variable = Variable $ VReference pointer
+        newPointer <- addTmpVariable variable
+        return $ VVariable newPointer variable
     execute (DereferenceExpression e) = do
         execute e >>= deref
     execute (LiteralExpression value) = do
         return value
     execute (IndexExpression p e1 e2) = do
-        VArray array <- execute e1 >>= deref
-        VI32 index <- execute e2
+        VArray array <- execute e1 >>= varValue
+        VI32 index <- execute e2 >>= varValue
         unless (0 <= index && index < length array) $ throwError (IndexOutOfRange p index (length array))
-        return $ VReference (listGet index array)
+        let objectPointer = listGet index array
+        variable <- getVariableById objectPointer
+        return $ VVariable objectPointer variable
     execute (CallExpression p function_object params) = do
         putPosition p
-        VFunction param_names code <- execute function_object >>= deref
+        VFunction param_names code <- execute function_object >>= varValue
         params' <- traverse (\(i, e) -> do
-            x <- execute e
+            x <- execute e >>= varValue
             return (i, x)) (zip param_names params)
         inNewScope $ do
             traverse_ (\(paramIdent, paramValue) -> do
@@ -142,26 +147,26 @@ instance Executable Expression Value where
             handler (Return v) = return v
             handler x = throwError x
     execute (I32DoubleOperatorExpression p operator e1 e2) = do
-        v1 <- execute e1
-        v2 <- execute e2
+        v1 <- execute e1 >>= varValue
+        v2 <- execute e2 >>= varValue
         doNumericDoubleOperator p operator v1 v2
     execute (BoolDoubleOperatorExpression operator e1 e2) = do
-        v1 <- execute e1
-        v2 <- execute e2
+        v1 <- execute e1 >>= varValue
+        v2 <- execute e2 >>= varValue
         doBooleanDoubleOperator operator v1 v2
     execute (AssignmentExpression e1 e2) = do
-        VReference ptr <- execute e1
-        v <- execute e2
+        VVariable ptr _ <- execute e1
+        v <- execute e2 >>= varValue
         setVariableById ptr v
-        return $ VReference ptr
+        return VUnit
     execute (UnaryMinusExpression e) = do
-        VI32 v <- execute e
+        VI32 v <- execute e >>= varValue
         return $ VI32 (-v)
     execute (UnaryNegationExpression e) = do
-        VBool v <- execute e
+        VBool v <- execute e >>= varValue
         return $ VBool (not v)
     execute (ReturnExpression e) = do
-        v <- execute e
+        v <- execute e >>= varValue
         throwError $ Return v
     execute BreakExpression = do
         throwError Break
@@ -206,7 +211,9 @@ equals (VArray a) (VArray b) = do
     if length a /= length b then do
         return False
     else do
-        out <- traverse (uncurry equals) (zip (fmap VReference a) (fmap VReference b))
+        values1 <- traverse getValueById a
+        values2 <- traverse getValueById b
+        out <- traverse (uncurry equals) (zip values1 values2)
         return $ and out
 equals (VReference a) (VReference b) = do
     if a == b then do

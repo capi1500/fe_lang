@@ -1,6 +1,7 @@
 fn main() {
+	print_string("input two numbers:\n");
     var a = input_i32();
     var b = input_i32();
-	print_string();
     print_i32(a + b);
+	print_string("\n");
 }

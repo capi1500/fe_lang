@@ -2,18 +2,17 @@ module TypeCheck.BorrowCheckerUtils where
 
 import Prelude hiding (null)
 import Data.Set
+import Data.Maybe
 import Data.Foldable hiding (null)
 import Control.Monad.State
 
 import Common.Types
+import Common.Printer
 
 import TypeCheck.Variable
 import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.VariablesUtils
-import Text.XHtml (variable)
-import Data.Maybe
-import Common.Printer
 import TypeCheck.Printer
 
 borrow :: VariableId -> PreprocessorMonad ()
@@ -77,7 +76,7 @@ moveOut variable = do
     else if state == Uninitialized then do
         addWarning $ VariableNotInitializedNotUsed (variableId variable)
     else  do
-        unless (state == Free) $ throw (CannotMoveOut variable)
+        unless (state == Free) $ throw (CannotMoveOut p variable)
         let value = variableValue variable
         when (owned value) $ dropValue value
         setVariableById (variableId variable) (setVariableState Moved variable)

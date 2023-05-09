@@ -19,29 +19,16 @@ valueOfBlock statements =
     else
         last statements
 
--- derefConditionally :: Bool -> ExecutorMonad Value -> ExecutorMonad Value
--- derefConditionally shouldBeReference exec = do
---     exec >>= if shouldBeReference then do
---             return
---         else do
---             deref
-
 deref :: Value -> ExecutorMonad Value
-deref (VReference pointer) = do
-    Variable value <- getVariableById pointer
-    return value
+deref (VVariable _ (Variable (VReference pointer))) = do
+    v <- getVariableById pointer
+    return $ VVariable pointer v
 deref x = do
     return x
 
--- derefVariable :: Bool -> Variable -> ExecutorMonad Variable
--- derefVariable shouldBeReference Uninitialized = do
---     return Uninitialized
--- derefVariable shouldBeReference (Variable value) = do
---     v' <- if shouldBeReference then do
---         return value
---     else do
---         deref value
---     return $ Variable v'
+varValue :: Value -> ExecutorMonad Value
+varValue (VVariable _ (Variable v)) = return v
+varValue x = return x
 
 instance CodePrint Variable where
     codePrint tabs Uninitialized = "null"
@@ -73,3 +60,6 @@ printVariables = do
     helper (Local parent map) = do
         helper parent
         printScope map
+
+print :: String -> ExecutorMonad ()
+print string = liftIO $ putStrLn string

@@ -1,4 +1,8 @@
-fn main() -> i32 {
+fn foo() -> i32 {
     var a = 1;
     *(&mut a)
+}
+
+fn main() {
+	print_i32(foo());
 }

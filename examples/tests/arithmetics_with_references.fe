@@ -1,0 +1,5 @@
+fn main() {
+    const a = 5;
+    const b = &a;
+    print_i32(a + b);
+}

@@ -11,7 +11,7 @@ import Common.Scope
 import TypeCheck.Variable
 import Common.Printer
 
-debug = False
+debug = True
 
 data PreprocessorError =
     TypeAlreadyInScope BNFC'Position Identifier Type Type | -- ident, new definition, old definition
@@ -27,7 +27,7 @@ data PreprocessorError =
     UseAfterMoved BNFC'Position VariableId |
     AssignmentToConstant BNFC'Position VariableId |
     AlreadyBorrowed BNFC'Position VariableId |
-    CannotMoveOut Variable |
+    CannotMoveOut BNFC'Position Variable |
     LifetimesMismatch BNFC'Position BNFC'Position Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |
     CannotTakeMutableReferenceToConstant BNFC'Position VariableId |
@@ -35,7 +35,7 @@ data PreprocessorError =
     CannotDerefReferenceToMultipleVariables BNFC'Position |
     WrongNumberOfParams BNFC'Position Type |
     Other String BNFC'Position |
-    CannotComapreFunctions Type |
+    CannotCompareFunctions Type |
     BreakNotInLoop BNFC'Position |
     ContinueNotInLoop BNFC'Position |
     Fatal String

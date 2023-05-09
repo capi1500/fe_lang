@@ -34,7 +34,7 @@ inNewFrame f = do
     putTypeDefinitions $ Local (typeDefinitions state) empty
     ret' <- f
     putPosition p
-    reproduceWithPersistent state
+    reproduceWithPersistent (variables state) state
     return ret'
 
 inNewScope :: PreprocessorMonad a -> PreprocessorMonad a
@@ -47,13 +47,13 @@ inNewScope f = do
     putTypeDefinitions $ Local (typeDefinitions state) empty
     ret <- f
     putPosition p
-    reproduceWithPersistent state
+    variables <- gets variables
+    reproduceWithPersistent variables state
     return ret
 
-reproduceWithPersistent :: PreprocessorState -> PreprocessorMonad ()
-reproduceWithPersistent state = do
-    variables <- gets variables
-    let Variables (Local _ map) _ = variables
+reproduceWithPersistent :: Variables -> PreprocessorState -> PreprocessorMonad ()
+reproduceWithPersistent variables state = do
+    let map = getMap variables
     traverse_ moveOutById (sortBy (flip compare) (elems map))
 
     warnings <- gets warnings
@@ -65,12 +65,15 @@ reproduceWithPersistent state = do
     LifetimeState lifetime _ <- gets lifetimeState
     putWarnings warnings
     putLifetimeState (LifetimeState lifetime id)
+  where
+    getMap (Variables (Global map) _) = map
+    getMap (Variables (Local _ map) _) = map
 
 withinContext :: PreprocessorMonad a -> PreprocessorMonad a
 withinContext f = do
-    context <- gets context
+    context <- gets expressionContext
     ret <- f
-    putContext context
+    putExpressionContext context
     return ret
 
 endStatement :: PreprocessorMonad ()

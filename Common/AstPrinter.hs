@@ -25,12 +25,13 @@ instance CodePrint Expression where
     codePrint tabs (WhileExpression condition block) = "while (" ++ codePrint tabs condition ++ ") " ++ codePrint tabs block
     codePrint tabs (LiteralExpression value) = codePrint tabs value
     codePrint tabs (VariableExpression ident) = ident
-    codePrint tabs (ReferenceExpression ident) = "&" ++ ident
+    codePrint tabs (ReferenceExpression e) = "&" ++ codePrint tabs e
     codePrint tabs (DereferenceExpression e) = "*" ++ codePrint tabs e
     codePrint tabs (IndexExpression _ e1 e2) = codePrint tabs e1 ++ "[" ++ codePrint tabs e2 ++ "]"
     codePrint tabs (BoolDoubleOperatorExpression op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (I32DoubleOperatorExpression _ op e1 e2) = codePrint tabs e1 ++ " " ++ codePrint tabs op ++ " " ++ codePrint tabs e2
     codePrint tabs (UnaryMinusExpression e) = "-" ++ codePrint tabs e
+    codePrint tabs (UnaryNegationExpression e) = "!(" ++ codePrint tabs e ++ ")"
     codePrint tabs (MakeArrayExpression values) =
         "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
     codePrint tabs (MakeArrayDefaultsExpression e1 e2) = "[" ++ codePrint tabs e1 ++ "; " ++ codePrint tabs e2 ++ "]"
@@ -46,6 +47,8 @@ instance CodePrint Value where
     codePrint _ (VBool b) = show b
     codePrint _ VUnit = "()"
     codePrint _ (VReference ptr) = "ptr(" ++ show ptr ++ ")"
+    codePrint tabs (VVariable ptr (Variable var)) = "(ptr(" ++ show ptr ++ "), " ++ codePrint tabs var ++ ")"
+    codePrint tabs (VVariable ptr Uninitialized) = "(ptr(" ++ show ptr ++ "), null)"
     codePrint tabs (VArray lst) = "[" ++ intercalate ", " (fmap (\x -> "ptr(" ++ codePrint tabs x ++ ")") lst) ++ "]"
     codePrint _ _ = "<internal>"
 

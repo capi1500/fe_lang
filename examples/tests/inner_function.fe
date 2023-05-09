@@ -1,0 +1,9 @@
+fn main() {
+	fn foo() {
+		print_i32(1);
+	}
+	
+	var x = 4;
+	
+	foo();
+}

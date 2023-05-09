@@ -42,8 +42,14 @@ getVariable ident = do
 
 getVariableById :: Pointer -> ExecutorMonad Variable
 getVariableById id = do
-  variables <- gets variables
-  return $ listGet id variables
+    variables <- gets variables
+    return $ listGet id variables
+
+getValueById :: Pointer -> ExecutorMonad Value
+getValueById id = do
+    variables <- gets variables
+    let Variable v = listGet id variables
+    return v
 
 setVariableById :: Pointer -> Value -> ExecutorMonad ()
 setVariableById id value = do

@@ -76,7 +76,7 @@ data Expression =
     MakeArrayExpression [Expression] |
     MakeArrayDefaultsExpression Expression Expression | -- size, default
     VariableExpression Identifier | -- ident, isRef
-    ReferenceExpression Identifier |
+    ReferenceExpression Expression |
     DereferenceExpression Expression |
     -- StructExpression Ident [StructExpressionField]
     -- ArrayExpressionItems [ArrayElement]
@@ -129,7 +129,12 @@ data Value =
     VVariant Int Pointer | -- value_tag, value
     VFunction [Identifier] Expression | -- params, code
     VArray [Pointer] | -- values
-    VReference Pointer
+    VReference Pointer |
+    VVariable Pointer Variable -- pointer to self, value
+
+-- instance CodePrint Variable where
+--     codePrint tabs (Variable value) = codePrint tabs value
+--     codePrint tabs Uninitialized = "null"
 
 isString :: [Value] -> Bool
 isString = all isChar

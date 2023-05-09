@@ -8,7 +8,7 @@ import Control.Monad.State
 
 import qualified Fe.Abs as A
 
-import Common.Ast hiding (Other, Value)
+import Common.Ast hiding (position, Other, Value)
 import Common.Types
 import Common.Utils
 import Common.Scope
@@ -107,17 +107,24 @@ stripReferences value = do
     helper (valueType value) value
     where
         helper (TReference _ t) value = do
-            variable <- getVariableById (deref value)
-            (e, v) <- stripReferences (variableValue variable)
-            return (DereferenceExpression . e, v)
+            do {
+                derefed <- deref value;
+                variable <- getVariableById derefed;
+                (e, v) <- stripReferences (variableValue variable);
+                return (DereferenceExpression . e, v)
+            } `catchError` handler
         helper t value = return (id, value)
+        handler (CannotDerefReferenceToMultipleVariables _) = return (id, value)
+        handler e = throw e
 
 
-deref :: Value -> VariableId
-deref borrowedValue =
-    let borrows' = borrows borrowedValue in
-    let borrowsMut' = borrowsMut borrowedValue in
-    if null borrows' then
+deref :: Value -> PreprocessorMonad VariableId
+deref borrowedValue = do
+    p <- gets position
+    let borrows' = borrows borrowedValue
+    let borrowsMut' = borrowsMut borrowedValue
+    unless (length borrows' + length borrowsMut' == 1) $ throw (CannotDerefReferenceToMultipleVariables p)
+    return $ if null borrows' then
             head borrowsMut'
         else
             head borrows'

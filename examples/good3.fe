@@ -1,18 +1,20 @@
 fn main() {
-	fn when_odd(x: i32) -> i32 {
-		x * 3
-	}
-	fn when_even(x: i32) -> i32 {
-		x / 2
-	}
-	
-	var x = input_i32();
-	while (x != 1) {
-		print_i32(x);
-		x = if (x % 2 == 0) {
-			when_even
-		} else {
-			when_odd
-		}(x);
-	}
+    fn when_odd(x: &mut i32) {
+        *x = x * 3 + 1;
+    }
+    fn when_even(x: &mut i32) {
+        *x = x / 2;
+    }
+    
+    var x = input_i32();
+    while (x != 1) {
+        print_i32(x);
+        print_string("\n");
+        if (x % 2 == 0) {
+            when_even
+        } else {
+            when_odd
+        }(&mut x);
+    }
 }
+

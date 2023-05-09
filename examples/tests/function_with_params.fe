@@ -2,7 +2,7 @@ fn foo(y: i32) -> i32 {
     y + 1
 }
 
-fn main() -> i32 {
+fn main() {
     var x = foo(5);
-    x
+    print_i32(x);
 }

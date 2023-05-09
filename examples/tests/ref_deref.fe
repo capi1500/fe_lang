@@ -1,7 +1,16 @@
-fn main() -> i32 {
+fn main() {
     var x = 1;
     var y = 2;
-    var z = &mut x;
+    var t = 4;
+	var a = &mut x;
+    var z: &mut i32;
+    z = &mut t;
+    print_i32(z);
+    print_string("\n");
     *(&mut z) = &mut y;
-    *z
+    print_i32(z);
+    print_string("\n");
+    z = a;
+    print_i32(z);
+    print_string("\n");
 }
