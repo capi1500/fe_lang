@@ -14,10 +14,13 @@ import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.VariablesUtils
 import TypeCheck.Printer
+import Fe.Abs (BNFC'Position)
 
-borrow :: VariableId -> PreprocessorMonad ()
-borrow borrowedId = borrowInternal borrowedId markAsBorrowed
+borrow :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
+borrow borrow' = borrowInternal borrow' markAsBorrowed
   where
+    borrowedId = fst borrow'
+
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
     markAsBorrowed variable = do
         p <- gets position
@@ -33,9 +36,11 @@ borrow borrowedId = borrowInternal borrowedId markAsBorrowed
             throw $ AlreadyBorrowed p borrowedId
         return $ setVariableState state' variable
 
-borrowMut :: VariableId -> PreprocessorMonad ()
-borrowMut borrowedId = borrowInternal borrowedId markAsBorrowed
+borrowMut :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
+borrowMut borrow' = borrowInternal borrow' markAsBorrowed
   where
+    borrowedId = fst borrow'
+
     markAsBorrowed :: Variable -> PreprocessorMonad Variable
     markAsBorrowed variable = do
         p <- gets position
@@ -44,8 +49,9 @@ borrowMut borrowedId = borrowInternal borrowedId markAsBorrowed
         when (isConst (variableMutability variable)) $ throw (CannotTakeMutableReferenceToConstant p borrowedId)
         return $ setVariableState (BorrowedMut p) variable
 
-borrowInternal :: VariableId -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
-borrowInternal borrowedId markAsBorrowed = do
+borrowInternal :: (VariableId, BNFC'Position) -> (Variable -> PreprocessorMonad Variable) -> PreprocessorMonad ()
+borrowInternal borrow markAsBorrowed = do
+    let borrowedId = fst borrow
     getVariableById borrowedId >>= markAsBorrowed >>= setVariableById borrowedId
 
 
@@ -88,23 +94,21 @@ makeBorrow id mut = do
     doBorrow p mut (variableType var)
   where
     doBorrow p Const t = do
-        borrow id
+        borrow (id, p)
         return Value {
-            valueCreatedAt = p,
             valueType = TReference Const t,
             ownedPlaces = [],
-            borrows = [id],
+            borrows = [(id, p)],
             borrowsMut = [],
             owned = True
         }
     doBorrow p Mutable t = do
-        borrowMut id
+        borrowMut (id, p)
         return Value {
-            valueCreatedAt = p,
             valueType = TReference Mutable t,
             ownedPlaces = [],
             borrows = [],
-            borrowsMut = [id],
+            borrowsMut = [(id, p)],
             owned = True
         }
 
@@ -122,18 +126,20 @@ dropValue value = do
     traverse_ removeBorrow (borrows value)
     traverse_ removeBorrowMut (borrowsMut value)
   where
-    removeBorrow :: VariableId -> PreprocessorMonad ()
-    removeBorrow borrowedId = do
-        printDebug ("    Removing borrow of " ++ show borrowedId ++ " (at " ++ show (valueCreatedAt value) ++ ")")
+    removeBorrow :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
+    removeBorrow borrow = do
+        let borrowedId = fst borrow
+        let p = snd borrow
+        printDebug ("    Removing borrow of " ++ show borrowedId ++ " (at " ++ show (fromJust p) ++ ")")
         variable <- getVariableById borrowedId
         let Borrowed borrowersCount borrowPositions = variableState variable
         let state' = if borrowersCount == 1 then Free
-                else Borrowed (borrowersCount - 1) (delete (valueCreatedAt value) borrowPositions)
+                else Borrowed (borrowersCount - 1) (delete p borrowPositions)
         printDebug ("   New variable state " ++ show state')
         setVariableById borrowedId (setVariableState state' variable)
         return ()
-    removeBorrowMut :: VariableId -> PreprocessorMonad ()
-    removeBorrowMut borrowedId = do
-        printDebug ("    Removing mutable borrow of " ++ show borrowedId)
-        mutateVariableById borrowedId (setVariableState Free)
+    removeBorrowMut :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
+    removeBorrowMut borrow = do
+        printDebug ("    Removing mutable borrow of " ++ show (fst borrow) ++ " (at " ++ show (fromJust (snd borrow)) ++ ")")
+        mutateVariableById (fst borrow) (setVariableState Free)
         return ()

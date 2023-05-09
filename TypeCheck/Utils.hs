@@ -2,13 +2,13 @@ module TypeCheck.Utils where
 
 import Data.Map ( empty, insert, fromList, lookup, Map )
 import Data.Maybe (isNothing, isJust, fromJust)
-import Data.List (intercalate)
+import Data.List (intercalate, nub)
 import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Fe.Abs as A
 
-import Common.Ast hiding (position, Other, Value)
+import Common.Ast hiding (Uninitialized, Variable, position, Other, Value)
 import Common.Types
 import Common.Utils
 import Common.Scope
@@ -22,6 +22,7 @@ import TypeCheck.Variable
 import TypeCheck.VariablesUtils
 import TypeCheck.LifetimeUtils
 import TypeCheck.Printer
+import Data.Set (union, size)
 
 assertType :: BNFC'Position -> Type -> Type -> PreprocessorMonad ()
 assertType p actualType expectedType = do
@@ -95,6 +96,45 @@ mergeFunctionTypesOrThrow p f1 f2 = do
     when (params1 /= params2 || returnType1 /= returnType2) $ throw (TypeMismatch p f1 f2)
     return $ TFunction (getStricterOfFunctionKinds kind1 kind2) params1 returnType1
 
+mergeVariables :: [Variable] -> [Variable] -> PreprocessorMonad [Variable]
+mergeVariables vars1 vars2 = do
+    p <- gets position
+    traverse (uncurry (mergeVariable p)) (zip vars1 vars2)
+  where
+    mergeVariable p v1 v2 = do
+        when (variableId v1 /= variableId v2 && variableCreatedAt v1 /= variableCreatedAt v2) $ throw (Fatal "cannot merge variables in if")
+        state <- mergeStates p (variableId v1) (variableState v1) (variableState v2)
+        let value = mergeValues (variableValue v1) (variableValue v2)
+        let vState = setVariableState state v1
+        let vValue = mutateVariableValue (const value) vState
+        return vValue
+
+    mergeStates p id Uninitialized Uninitialized = return Uninitialized
+    mergeStates p id Uninitialized s2 = throw $ CannotMergeStateAfterIf p id Uninitialized s2
+    mergeStates p id s1 Uninitialized = throw $ CannotMergeStateAfterIf p id s1 Uninitialized
+    mergeStates p id Moved Moved = return Moved
+    mergeStates p id Moved s2 = throw $ CannotMergeStateAfterIf p id Moved s2
+    mergeStates p id s1 Moved = throw $ CannotMergeStateAfterIf p id s1 Moved
+    mergeStates p id (Borrowed x1 set1) (Borrowed x2 set2) = do
+        let merged = set1 `union` set2
+        return $ Borrowed (size merged) merged
+    mergeStates p id (BorrowedMut p1) (BorrowedMut p2) = do
+        unless (p1 == p2) $ throw (CannotMergeStateAfterIf p id (BorrowedMut p1) (BorrowedMut p2))
+        return $ BorrowedMut p1
+    mergeStates p id s1 Free = return s1
+    mergeStates p id Free s2 = return s2
+    mergeStates p id s1 s2 = throw $ CannotMergeStateAfterIf p id s1 s2
+
+    mergeValues v1 v2 =
+        Value {
+            valueType = valueType v1,
+            ownedPlaces = ownedPlaces v1,
+            borrows = nub $ borrows v1 ++ borrows v2,
+            borrowsMut = nub $ borrowsMut v1 ++ borrowsMut v2,
+            owned = owned v1
+        }
+
+
 nameOfItem :: A.Item -> String
 nameOfItem (A.ItemFunction _ (A.Ident ident) _ _ _ _) = ident
 nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
@@ -103,7 +143,6 @@ nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
 
 stripReferences :: Value -> PreprocessorMonad (Expression -> Expression, Value)
 stripReferences value = do
-    printDebug ("Strip reference of " ++ codePrint 0 (valueType value))
     helper (valueType value) value
     where
         helper (TReference _ t) value = do
@@ -124,7 +163,7 @@ deref borrowedValue = do
     let borrows' = borrows borrowedValue
     let borrowsMut' = borrowsMut borrowedValue
     unless (length borrows' + length borrowsMut' == 1) $ throw (CannotDerefReferenceToMultipleVariables p)
-    return $ if null borrows' then
+    return $ fst (if null borrows' then
             head borrowsMut'
         else
-            head borrows'
+            head borrows')

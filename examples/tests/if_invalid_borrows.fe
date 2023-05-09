@@ -1,9 +1,9 @@
 fn main() {
 	var x = 4;
-	var y = &x;
+	var y: &i32;
 	if (true) {
-		print_i32(y);
+		y = &x;
 	} else {
-		print_i32(y);
+		x = 5;
 	}
 }

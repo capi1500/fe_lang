@@ -82,7 +82,6 @@ makeInternalFunction id name t = Variable {
     variableMutability = Const,
     variableState = Free,
     variableValue = Value {
-        valueCreatedAt = Nothing,
         valueType = t,
         ownedPlaces = [],
         borrows = [],

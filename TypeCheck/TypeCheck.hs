@@ -161,7 +161,7 @@ instance TypeCheck A.Item Statement where
             addVariable name mutability (setValueOwned True value)
             return $ VarInitialized expression'
         else do
-            id <- addVariable name mutability (Value p declaredType [] [] [] True)
+            id <- addVariable name mutability (Value declaredType [] [] [] True)
             mutateVariableById id (setVariableState Uninitialized)
             return VarUninitialized
 
@@ -242,10 +242,7 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.VariableExpression p (A.Ident name)) = do
         putPosition p
         context <- gets expressionContext
-        -- printVariables
-        printDebug $ "get variable `" ++ name ++ "`"
         Variables mappings _ <- gets variables
-        printDebug $ show mappings
         variable <- getVariable name
         let id = variableId variable
         when (isValueContext context && variableState variable == Uninitialized) $ throw (UninitializedVariableUsed p id)
@@ -454,7 +451,6 @@ makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
 
-    -- printVariables
     assertType p (valueType v1) (valueType v2)
 
     let TReference _ innerT = valueType v1
@@ -484,14 +480,12 @@ makeI32ComparisonExpression e1 e2 operator = do
     v1 <- makeImplicitBorrowValue id1 Const
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
-    -- printVariables
 
     assertType (hasPosition e1) (valueType v1) (TReference Const i32Type) -- here its a reference to int vs int
     assertType (hasPosition e2) (valueType v2) (TReference Const i32Type)
     expressionType <- makeValue (hasPosition e1) boolType False >>= createValueExpression
     dropValue v1
     dropValue v2
-    -- printVariables
     return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') expressionType
 
 makeAssignmentExpression :: A.AssignmentOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
@@ -518,7 +512,6 @@ makeAssignmentExpression (A.Assign p) e1 e2 = do
 
     when (variableState place == Uninitialized) $ mutateVariableById placeId (setVariableState Free)
     mutateVariableById placeId (mutateVariableValue (const (setValueOwned True newValue)))
-    -- printVariables
 
     et <- makeValue (hasPosition e1) unitType False >>= createValueExpression
     return $ TypedExpression (AssignmentExpression e1' e2') et
@@ -557,13 +550,16 @@ ifExpression p condition onTrue onFalse = do
         return condition'
 
     -- need to preserve state of variables before onTrue and onFalse. Then merge them
+    Variables mappings variablesBeforeIf <- gets variables
     (onTrue', onTrueValue) <- do
         (onTrue', onTrueValue) <- typeCheckInValueContext Nothing onTrue
         -- printDebug "onTrue"
         -- printVariables
         return (onTrue', onTrueValue)
     let onTrueType = valueType onTrueValue
+    Variables _ variablesAfterTrue <- gets variables
 
+    putVariables $ Variables mappings variablesBeforeIf
     (onFalse', onFalseValue) <- do
         if isNothing onFalse then do
             value <- makeValue p unitType False
@@ -574,6 +570,17 @@ ifExpression p condition onTrue onFalse = do
             -- printVariables
             return (Just onFalse', onFalseValue)
     let onFalseType = valueType onFalseValue
+    Variables _ variablesAfterFalse <- gets variables
+
+    putPosition p
+    printDebug "After True:\n"
+    printDebug $ codePrint 0 variablesAfterTrue
+    printDebug "After False:\n"
+    printDebug $ codePrint 0 variablesAfterFalse
+    mergedVariables <- mergeVariables variablesAfterTrue variablesAfterFalse
+    putVariables $ Variables mappings mergedVariables
+    printDebug "Merged:\n"
+    printDebug $ codePrint 0 mergedVariables
 
     t <- if isFunction onTrueType && isFunction onFalseType then do
         mergeFunctionTypesOrThrow (hasPosition onTrue) onTrueType onFalseType
@@ -582,7 +589,6 @@ ifExpression p condition onTrue onFalse = do
         return onTrueType
 
     let value = Value {
-        valueCreatedAt = p,
         valueType = t,
         ownedPlaces = ownedPlaces onTrueValue ++ ownedPlaces onFalseValue,
         borrows = borrows onTrueValue ++ borrows onFalseValue,

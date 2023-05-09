@@ -12,9 +12,9 @@ import TypeCheck.Error
 
 makeValue :: BNFC'Position -> Type -> Bool -> PreprocessorMonad Value
 makeValue p TUntyped owned = do
-    return $ Value p TUntyped [] [] [] owned
+    return $ Value TUntyped [] [] [] owned
 makeValue p (TPrimitive t) owned = do
-    return $ Value p (TPrimitive t) [] [] [] owned
+    return $ Value (TPrimitive t) [] [] [] owned
 makeValue p (TStruct fields) owned = do
     throw $ Other "Structs not yet implemented" p
     -- return $ Value p (TStruct name fields) [] [] [] owned
@@ -22,18 +22,18 @@ makeValue p (TVariant types) owned = do
     throw $ Other "Variants not yet implemented" p
     -- return $ Value p (TVariant name types) [] [] [] owned
 makeValue p (TFunction kind params ret) owned = do
-    return $ Value p (TFunction kind params ret) [] [] [] owned
+    return $ Value (TFunction kind params ret) [] [] [] owned
 makeValue p (TArray t) owned = do
     inner <- makeValue p t True
     innerPlace <- addTemporaryVariable Mutable inner
-    return $ Value p (TArray t) [innerPlace] [] [] owned
+    return $ Value (TArray t) [innerPlace] [] [] owned
 makeValue p (TReference Const t) owned = do
     inner <- makeValue p t True
     innerPlace <- addTemporaryVariable Const inner
-    borrow innerPlace
-    return $ Value p (TReference Const t) [] [innerPlace] [] owned
+    borrow (innerPlace, p)
+    return $ Value (TReference Const t) [] [(innerPlace, p)] [] owned
 makeValue p (TReference Mutable t) owned = do
     inner <- makeValue p t True
     innerPlace <- addTemporaryVariable Mutable inner
-    borrowMut innerPlace
-    return $ Value p (TReference Mutable t) [] [] [innerPlace] owned
+    borrowMut (innerPlace, p)
+    return $ Value (TReference Mutable t) [] [] [(innerPlace, p)] owned

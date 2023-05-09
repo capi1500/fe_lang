@@ -26,11 +26,10 @@ data Lifetime = Lifetime [Int] Int -- lifetime predecessors ids list, (where beg
   deriving (Eq, Ord, Show, Read)
 
 data Value = Value {
-    valueCreatedAt :: BNFC'Position,
     valueType :: Type,
     ownedPlaces :: [VariableId], -- for arrays, it is only one variableId containing info about all indices
-    borrows :: [VariableId],
-    borrowsMut :: [VariableId],
+    borrows :: [(VariableId, BNFC'Position)],
+    borrowsMut :: [(VariableId, BNFC'Position)],
     owned :: Bool
 } deriving (Eq, Ord, Show, Read)
 
@@ -62,5 +61,5 @@ setVariableId id (Variable createdAt variableIdentifier variableType _ const var
     Variable createdAt variableIdentifier variableType id const variableState value lifetime
 
 setValueOwned :: Bool -> Value -> Value
-setValueOwned owned (Value createdAt t ownedPlaces borrows borrowsMut _) =
-    Value createdAt t ownedPlaces borrows borrowsMut owned
+setValueOwned owned (Value t ownedPlaces borrows borrowsMut _) =
+    Value t ownedPlaces borrows borrowsMut owned

@@ -34,10 +34,11 @@ data PreprocessorError =
     CannotDerefNotReference BNFC'Position Type |
     CannotDerefReferenceToMultipleVariables BNFC'Position |
     WrongNumberOfParams BNFC'Position Type |
-    Other String BNFC'Position |
     CannotCompareFunctions Type |
     BreakNotInLoop BNFC'Position |
     ContinueNotInLoop BNFC'Position |
+    CannotMergeStateAfterIf BNFC'Position VariableId VariableState VariableState |
+    Other String BNFC'Position |
     Fatal String
   deriving (Eq, Ord, Show, Read)
 

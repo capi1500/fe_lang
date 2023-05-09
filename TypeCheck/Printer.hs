@@ -37,12 +37,11 @@ instance CodePrint Variables where
   codePrint tabs (Variables _ list) = "[" ++ intercalate ("\n" ++ printTabs tabs) (fmap show list) ++ "]"
 
 instance CodePrint Value where
-    codePrint tabs (Value createdAt t _ borrows borrowsMut owned) =
+    codePrint tabs (Value t _ borrows borrowsMut owned) =
         "Value {\n" ++
         printTabs (tabs + 1) ++ codePrint tabs t ++ "\n" ++
-        printTabs (tabs + 1) ++ "borrows: " ++ codePrint tabs borrows ++ "\n" ++
-        printTabs (tabs + 1) ++ "borrowsMut: " ++ codePrint tabs borrowsMut ++ "\n" ++
-        printTabs (tabs + 1) ++ "created at: " ++ show createdAt ++ "\n" ++
+        printTabs (tabs + 1) ++ "borrows: " ++ intercalate ", " (fmap (\(i, w) -> "(" ++ show i ++ ", " ++ show (fromJust w) ++ ")") borrows) ++ "\n" ++
+        printTabs (tabs + 1) ++ "borrowsMut: " ++ intercalate ", " (fmap (\(i, w) -> "(" ++ show i ++ ", " ++ show (fromJust w) ++ ")") borrowsMut) ++ "\n" ++
         printTabs (tabs + 1) ++ "owned: " ++ show owned ++ "\n" ++
         printTabs tabs ++ "}"
 
