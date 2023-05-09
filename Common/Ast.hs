@@ -75,6 +75,7 @@ data Expression =
     LiteralExpression Value |
     MakeArrayExpression [Expression] |
     MakeArrayDefaultsExpression Expression Expression | -- size, default
+    MakeClosureExpression [Identifier] Expression | -- params, expression
     VariableExpression Identifier | -- ident, isRef
     ReferenceExpression Expression |
     DereferenceExpression Expression |

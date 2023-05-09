@@ -35,7 +35,7 @@ import TypeCheck.StateUtils
 import TypeCheck.BorrowCheckerUtils
 import TypeCheck.Printer
 import TypeCheck.ValueUtils
-import TypeCheck.ExpectationsUtils
+import TypeCheck.ContextUtils
 
 class TypeCheck a b where
     typeCheck :: a -> PreprocessorMonad b
@@ -269,6 +269,29 @@ instance TypeCheck A.Expression TypedExpression where
         et <- makeValue p (TArray innerType) False >>= createValueExpression
 
         return $ TypedExpression (MakeArrayDefaultsExpression e1' e2') et
+    typeCheck (A.ClosureExpression p captures params returnType e) = do
+        -- captures' <- traverse typeCheck captures
+        params' <- traverse typeCheck params
+        returnType' <- typeCheck returnType
+
+        let addFunctionParam = \(name, t) -> do
+                putPosition p
+                makeValue p t True >>= addVariable name Mutable
+
+        let paramTypes = fmap fst params'
+        let paramIds = fmap snd params'
+        putPosition p
+        (expression', actualType) <- inNewFrame $ do
+                setCurrentFunctionReturnType returnType'
+                traverse_ addFunctionParam params'
+                (expression', value) <- typeCheckInValueContext Nothing e
+                unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
+                dropValue value
+                return (expression', valueType value)
+
+        let kind = Fn
+        et <- makeValue p (TFunction kind paramIds returnType') False >>= createValueExpression
+        return $ TypedExpression (MakeClosureExpression paramTypes expression') et
     typeCheck (A.CallExpression p function params) = do
         (functionId, function') <- do
             (function', id) <- typeCheckInPlaceContext Const function
@@ -371,8 +394,6 @@ instance TypeCheck A.Expression TypedExpression where
         else do
             -- borrowedVariable is borrowing mutably
             return $ TypedExpression (DereferenceExpression e') (PlaceType mutability derefedPlaceId)
-
-
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         (e', borrowedId) <- typeCheckInPlaceContext Const e
         v <- makeBorrow borrowedId Const
@@ -553,8 +574,6 @@ ifExpression p condition onTrue onFalse = do
     Variables mappings variablesBeforeIf <- gets variables
     (onTrue', onTrueValue) <- do
         (onTrue', onTrueValue) <- typeCheckInValueContext Nothing onTrue
-        -- printDebug "onTrue"
-        -- printVariables
         return (onTrue', onTrueValue)
     let onTrueType = valueType onTrueValue
     Variables _ variablesAfterTrue <- gets variables
@@ -566,21 +585,13 @@ ifExpression p condition onTrue onFalse = do
             return (Nothing, value)
         else do
             (onFalse', onFalseValue) <- typeCheckInValueContext Nothing (fromJust onFalse)
-            -- printDebug "onFalse"
-            -- printVariables
             return (Just onFalse', onFalseValue)
     let onFalseType = valueType onFalseValue
     Variables _ variablesAfterFalse <- gets variables
 
     putPosition p
-    printDebug "After True:\n"
-    printDebug $ codePrint 0 variablesAfterTrue
-    printDebug "After False:\n"
-    printDebug $ codePrint 0 variablesAfterFalse
     mergedVariables <- mergeVariables variablesAfterTrue variablesAfterFalse
     putVariables $ Variables mappings mergedVariables
-    printDebug "Merged:\n"
-    printDebug $ codePrint 0 mergedVariables
 
     t <- if isFunction onTrueType && isFunction onFalseType then do
         mergeFunctionTypesOrThrow (hasPosition onTrue) onTrueType onFalseType

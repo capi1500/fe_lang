@@ -111,6 +111,8 @@ instance Executable Expression Value where
             addTmpVariable (Variable value)
             ) [1..size]
         return $ VArray pointers
+    execute (MakeClosureExpression params e) = do
+        return $ VFunction params e
     execute (VariableExpression ident) = do
         (pointer, variable) <- getVariable ident
         return $ VVariable pointer variable

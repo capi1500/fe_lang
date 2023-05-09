@@ -1,0 +1,14 @@
+fn apply(f: Fn(i32)) {
+	f(4);
+}
+
+fn main() {
+	const x = | |(x: i32) {
+			print_i32(x);
+		};
+	apply(x);
+	
+	apply(| |(x: i32) {
+			print_i32(x + 5);
+		});
+}

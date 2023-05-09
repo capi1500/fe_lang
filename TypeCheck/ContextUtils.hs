@@ -1,4 +1,4 @@
-module TypeCheck.ExpectationsUtils where
+module TypeCheck.ContextUtils where
 
 import Control.Monad.State
 

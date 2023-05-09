@@ -85,6 +85,5 @@ internalCreateValueExpression value (PlaceContext mutability) = do
     return $ PlaceType mutability tempId
 internalCreateValueExpression value (ValueContext expectedType) = do
     p <- gets position
-    printDebug $ "   expected: " ++ show expectedType
     forM_ expectedType (assertType p (valueType value))
     return $ ValueType value

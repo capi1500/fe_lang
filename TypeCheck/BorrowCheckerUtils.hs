@@ -75,7 +75,6 @@ moveOutById variableId = do
 moveOut :: Variable -> PreprocessorMonad ()
 moveOut variable = do
     p <- gets position
-    printDebug ("Moving out " ++ codePrint 1 variable ++ " at " ++ show p)
     let state = variableState variable
     if state == Moved then do
         return ()
@@ -116,12 +115,10 @@ makeBorrow id mut = do
 makeImplicitBorrowValue :: VariableId -> Mutable -> PreprocessorMonad Value
 makeImplicitBorrowValue id mutability = do
     value <- makeBorrow id mutability
-    printDebug ("implicit borrow of " ++ show id)
     return (setValueOwned False value)
 
 dropValue :: Value -> PreprocessorMonad ()
 dropValue value = do
-    printDebug ("Dropping " ++ codePrint 1 value)
     traverse_ moveOutById (ownedPlaces value)
     traverse_ removeBorrow (borrows value)
     traverse_ removeBorrowMut (borrowsMut value)
@@ -130,16 +127,13 @@ dropValue value = do
     removeBorrow borrow = do
         let borrowedId = fst borrow
         let p = snd borrow
-        printDebug ("    Removing borrow of " ++ show borrowedId ++ " (at " ++ show (fromJust p) ++ ")")
         variable <- getVariableById borrowedId
         let Borrowed borrowersCount borrowPositions = variableState variable
         let state' = if borrowersCount == 1 then Free
                 else Borrowed (borrowersCount - 1) (delete p borrowPositions)
-        printDebug ("   New variable state " ++ show state')
         setVariableById borrowedId (setVariableState state' variable)
         return ()
     removeBorrowMut :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
     removeBorrowMut borrow = do
-        printDebug ("    Removing mutable borrow of " ++ show (fst borrow) ++ " (at " ++ show (fromJust (snd borrow)) ++ ")")
         mutateVariableById (fst borrow) (setVariableState Free)
         return ()
