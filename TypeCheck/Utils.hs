@@ -46,11 +46,11 @@ isInitialized (A.Initialized _ _) = True
 isInitialized (A.UnInitialized _) = False
 
 -- TODO: deal with annotated lifetimes
-modifyType :: Type -> A.TypeModifier -> PreprocessorMonad Type
-modifyType t (A.Ref _ lifetime) = do
+modifyType :: A.TypeModifier -> Type -> PreprocessorMonad Type
+modifyType (A.Ref _ lifetime) t = do
     lifetime' <- castLifetime lifetime
     return $ TReference Const t
-modifyType t (A.MutRef _ lifetime) = do
+modifyType (A.MutRef _ lifetime) t = do
     lifetime' <- castLifetime lifetime
     return $ TReference Mutable t
 

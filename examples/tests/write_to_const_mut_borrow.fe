@@ -1,0 +1,7 @@
+fn main() {
+    var x = 4;
+    var z = 4;
+    const y = &mut x;
+    y = &mut z;
+    print_i32(x);
+}

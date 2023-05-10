@@ -11,12 +11,11 @@ import Common.Scope
 import Common.Types
 import Common.Printer
 import Common.AstPrinter
+import Common.Ast (Expression)
+import Common.InternalFunctions hiding (makeInternalFunction)
 
 import TypeCheck.Error
 import TypeCheck.Variable
-import Data.List (intercalate)
-import Common.Ast (Expression)
-import Common.InternalFunctions hiding (makeInternalFunction)
 
 
 type TypeDefinitions = Scope (Map Identifier Type)
@@ -32,7 +31,7 @@ data ExpressionType = PlaceType Mutable VariableId | ValueType Value
     deriving (Eq, Ord, Show, Read)
 
 data Context = Context {
-    currentFunctionReturnType :: Type,
+    currentFunction :: Type,
     insideLoopExpression :: Bool
 } deriving (Eq, Ord, Show, Read)
 
@@ -68,7 +67,7 @@ makePreprocessorState = PreprocessorState {
     toDropAtStatementEnd = [],
     position = Nothing,
     context = Context {
-        currentFunctionReturnType = unitType,
+        currentFunction = unitType,
         insideLoopExpression = False
     }
 }
