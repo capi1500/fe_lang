@@ -1,0 +1,13 @@
+fn supplier() -> Fn(i32) {
+	var y = 5;
+	|y|(x: i32) {
+		print_i32(x + y);
+		print_string("\n");
+	}
+}
+
+fn main() {
+	supplier()(2);
+	supplier()(5);
+	supplier()(1);
+}

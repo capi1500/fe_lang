@@ -56,7 +56,7 @@ instance TypeCheck A.Type Type where
         typeCheck lifetime :: PreprocessorMonad ()
         params' <- traverse typeCheck params
         returnType' <- typeCheck returnType
-        return $ TFunction functionKind' params' returnType'
+        return $ TFunction functionKind' [] params' returnType'
 
 instance TypeCheck A.Code Code where
     typeCheck :: A.Code -> PreprocessorMonad Code
@@ -79,7 +79,7 @@ addToScope (A.ItemFunction p (A.Ident ident) lifetimes params returnType _) = do
     params' <- traverse typeCheck params
     declaredReturnType <- typeCheck returnType
     -- lifetimes' <- typeCheck lifetimes -- TODO: check explicit lifetimes
-    let t = TFunction Fn params' declaredReturnType
+    let t = TFunction Fn [] params' declaredReturnType
     makeValue p t True >>= addVariable ident Const
     return ()
 addToScope (A.ItemStruct p ident lifetimes fields) = do
@@ -96,6 +96,7 @@ addToScope (A.ItemVariable p cv (A.Ident ident) typeDeclaration initialization) 
 instance TypeCheck A.Statement Statement where
     typeCheck :: A.Statement -> PreprocessorMonad Statement
     typeCheck (A.SemicolonStatement p) = do
+        endStatement
         return EmptyStatement
     typeCheck (A.ItemStatement p item) = do
         putPosition p
@@ -120,7 +121,7 @@ instance TypeCheck A.Item Statement where
         putPosition p
         Variable _ _ functionType id _ _ value _ <- getVariable name
 
-        let TFunction _ declaredParams declaredType = functionType
+        let TFunction _ _ declaredParams declaredType = functionType
 
         let addFunctionParam = \(t, A.Parameter p (A.Ident name) _) -> do
                 putPosition p
@@ -129,7 +130,7 @@ instance TypeCheck A.Item Statement where
 
         putPosition p
         (expression', actualType, paramIds) <- inNewFrame $ do
-                setCurrentFunctionReturnType declaredType
+                setCurrentFunction functionType
                 paramIds <- traverse addFunctionParam (zip declaredParams params)
                 (expression', value) <- typeCheckInValueContext Nothing expression
                 unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
@@ -167,23 +168,6 @@ instance TypeCheck A.Item Statement where
             return VarUninitialized
 
         return $ NewVariableStatement name initialization'
-
-instance TypeCheck A.FunctionParam (Identifier, Type) where
-    typeCheck :: A.FunctionParam -> PreprocessorMonad (Identifier, Type)
-    typeCheck (A.Parameter p (A.Ident name) t) = do
-        t' <- typeCheck t
-        return (name, t')
-
-instance TypeCheck A.FunctionParam Type where
-    typeCheck :: A.FunctionParam -> PreprocessorMonad Type
-    typeCheck (A.Parameter p _ t) = typeCheck t
-
-instance TypeCheck A.TypeDeclaration Type where
-    typeCheck :: A.TypeDeclaration -> PreprocessorMonad Type
-    typeCheck (A.Untyped _) = do
-        return TUntyped
-    typeCheck (A.Typed _ t) = do
-        typeCheck t
 
 instance TypeCheck A.Expression TypedExpression where
     typeCheck :: A.Expression -> PreprocessorMonad TypedExpression
@@ -276,41 +260,64 @@ instance TypeCheck A.Expression TypedExpression where
         params' <- traverse typeCheck params
         returnType' <- typeCheck returnType
 
-        let addCapture = \(name, typeModifier) -> do
-                variable <- getVariable name
-                let t = variableType variable
-                t' <- typeModifier t :: PreprocessorMonad Type
-                return ()
+
+        let kind = Fn
+        let paramTypes = fmap fst params'
+        let paramIds = fmap snd params'
+        let captureTypes = fmap (\(_, _, i, m) -> Capture i m) captures'
+        let functionType = TFunction kind captureTypes paramIds returnType'
+
+        closureValue <- makeValue p functionType False
+        let handleCapture = \closure (p, variable, _, captureModifier) -> do
+            putPosition p
+            if captureModifier == CMRef Mutable then do
+                addBorrow closure (variableId variable) Mutable
+            else if captureModifier == CMRef Const then do
+                addBorrow closure (variableId variable) Const
+            else do
+                moveOutOrCopy variable
+                return closure
+
+        closureValue <- foldM handleCapture closureValue captures'
+        printDebug $ "Closure: " ++ codePrint 1 closureValue
 
         let addFunctionParam = \(name, t) -> do
                 putPosition p
                 makeValue p t True >>= addVariable name Const
-
-        let paramTypes = fmap fst params'
-        let paramIds = fmap snd params'
+        let addCapture = \(p, variable, name, captureModifier) -> do
+                putPosition p
+                let t = variableType variable
+                let t'  | captureModifier == CMRef Mutable = TReference Mutable t
+                        | captureModifier == CMRef Const = TReference Const t
+                        | otherwise = t
+                makeValue p t' True >>= addVariable name Const
         putPosition p
         (expression', actualType) <- inNewFrame $ do
-                setCurrentFunctionReturnType returnType'
+                setCurrentFunction functionType
                 traverse_ addCapture captures'
                 traverse_ addFunctionParam params'
                 (expression', value) <- typeCheckInValueContext Nothing e
                 unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
                 dropValue value
                 return (expression', valueType value)
-
-        let kind = Fn
-        et <- makeValue p (TFunction kind paramIds returnType') False >>= createValueExpression
-        return $ TypedExpression (MakeClosureExpression paramTypes expression') et
+        printVariables
+        et <- createValueExpression closureValue
+        return $ TypedExpression (MakeClosureExpression captureTypes paramTypes expression') et
     typeCheck (A.CallExpression p function params) = do
-        (functionId, function') <- do
-            (function', id) <- typeCheckInPlaceContext Const function
-            return (id, function')
+        (function', functionId) <- typeCheckInPlaceContext Const function
 
-        borrowedValue <- makeImplicitBorrowValue functionId Const
-        let TReference Const functionType = valueType borrowedValue
+        originalValue <- getVariableById functionId
+        (functionType, borrowedValue, mod) <- if isReference (variableType originalValue) then do
+            dummy <- makeValue Nothing unitType False
+            let TReference Const functionType = variableType originalValue
+            return (functionType, dummy, DereferenceExpression)
+        else do
+            borrowedValue <- makeImplicitBorrowValue functionId Const
+            let TReference Const functionType = valueType borrowedValue
+            return (functionType, borrowedValue, id)
         unless (isFunction functionType) $ do throw (ExpressionNotCallable p functionType)
 
-        let TFunction kind declaredParams returnType = functionType
+        let TFunction kind captures declaredParams returnType = functionType
         when (length params /= length declaredParams) $ throw (WrongNumberOfParams p functionType)
         let paramCheck = \(paramDeclaredType, A.CallParam _ param) -> do
             -- printDebug ("Param type: " ++ codePrint 1 paramDeclaredType)
@@ -319,26 +326,22 @@ instance TypeCheck A.Expression TypedExpression where
             dropValue paramValue -- TODO: for now, drop, transfer to return value when allowing for explicit lifetimes
             return paramExpression
 
+        -- TODO: captures
         params' <- traverse paramCheck (zip declaredParams params)
         dropValue borrowedValue
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         et <- makeValue p returnType False >>= createValueExpression
-        return $ TypedExpression (CallExpression p function' params') et
+        return $ TypedExpression (CallExpression p (mod function') params') et
     typeCheck (A.IndexExpression p e1 e2) = do
-        (e1', placeId, mut) <- withinContext $ do
-            context <- gets expressionContext
-            let mut = (case context of
-                    PlaceContext mutability -> mutability
-                    ValueContext _ -> Const)
-            putExpressionContext $ PlaceContext mut
-            putPosition (hasPosition e1)
-            TypedExpression e' et <- typeCheck e1
-            let PlaceType _ placeId = et
-            return (e', placeId, mut)
+        context <- gets expressionContext
+        let mut = (case context of
+                PlaceContext mutability -> mutability
+                ValueContext _ -> Const)
+        (e1', placeId) <- typeCheckInPlaceContext Const e1
 
         place <- getVariableById placeId
         -- Just as with methods, Rust will also insert dereference operations on a repeatedly to find an implementation. AKA remember the dereference level, AKA don't borrow if it's a reference
-        (mod1, arrayValue) <- stripReferences (variableValue place)
+        (mod1, arrayValue) <- stripReferences (variableValue place) mut
         let t = valueType arrayValue
 
         f <- if isArray (variableType place) then do
@@ -449,13 +452,13 @@ instance TypeCheck A.Expression TypedExpression where
         return $ TypedExpression ContinueExpression et
     typeCheck (A.ReturnExpressionUnit p) = do
         context <- gets context
-        let TFunction _ _ currentFunctionReturnType = currentFunction context
+        let TFunction _ _ _ currentFunctionReturnType = currentFunction context
         assertType p unitType currentFunctionReturnType
         et <- makeValue p unitType False >>= createValueExpression
         return $ TypedExpression (ReturnExpression (LiteralExpression VUnit)) et
     typeCheck (A.ReturnExpressionValue p e) = do
         context <- gets context
-        let TFunction _ _ currentFunctionReturnType = currentFunction context
+        let TFunction _ _ _ currentFunctionReturnType = currentFunction context
         (e', v) <- typeCheckInValueContext (Just currentFunctionReturnType) e
         et <- createValueExpression v
         return $ TypedExpression (ReturnExpression e') et
@@ -513,6 +516,7 @@ makeI32ComparisonExpression e1 e2 operator = do
     expressionType <- makeValue (hasPosition e1) boolType False >>= createValueExpression
     dropValue v1
     dropValue v2
+    endStatement
     return $ TypedExpression (BoolDoubleOperatorExpression operator e1' e2') expressionType
 
 makeAssignmentExpression :: A.AssignmentOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
@@ -573,7 +577,8 @@ instance TypeCheck A.IfExpression TypedExpression where
 ifExpression :: (TypeCheck a TypedExpression, HasPosition a) => A.BNFC'Position -> A.Expression -> A.Expression -> Maybe a -> PreprocessorMonad TypedExpression
 ifExpression p condition onTrue onFalse = do
     condition' <- do
-        (condition', _) <- typeCheckInValueContext (Just boolType) condition
+        (condition', v) <- typeCheckInValueContext (Just boolType) condition
+        dropValue v
         return condition'
 
     -- need to preserve state of variables before onTrue and onFalse. Then merge them
@@ -670,9 +675,33 @@ instance TypeCheck A.FunctionReturnType Type where
     typeCheck (A.ReturnUnit _) = do
         return unitType
 
-instance TypeCheck A.Capture (Identifier, Type -> PreprocessorMonad Type) where
-    typeCheck (A.Capture _ typeModifier (A.Ident ident)) = do
-        return (ident, modifyType typeModifier)
+instance TypeCheck A.FunctionParam (Identifier, Type) where
+    typeCheck :: A.FunctionParam -> PreprocessorMonad (Identifier, Type)
+    typeCheck (A.Parameter p (A.Ident name) t) = do
+        t' <- typeCheck t
+        return (name, t')
+
+instance TypeCheck A.FunctionParam Type where
+    typeCheck :: A.FunctionParam -> PreprocessorMonad Type
+    typeCheck (A.Parameter p _ t) = typeCheck t
+
+instance TypeCheck A.TypeDeclaration Type where
+    typeCheck :: A.TypeDeclaration -> PreprocessorMonad Type
+    typeCheck (A.Untyped _) = do
+        return TUntyped
+    typeCheck (A.Typed _ t) = do
+        typeCheck t
+
+instance TypeCheck A.Capture (A.BNFC'Position, Variable, Identifier, CaptureModifier) where
+    typeCheck (A.Capture p (A.Ident ident)) = do
+        var <- getVariable ident
+        return (p, var, ident, CMNone)
+    typeCheck (A.CaptureRef p (A.MutRef _ _) (A.Ident ident)) = do
+        var <- getVariable ident
+        return (p, var, ident, CMRef Mutable)
+    typeCheck (A.CaptureRef p (A.Ref _ _) (A.Ident ident)) = do
+        var <- getVariable ident
+        return (p, var, ident, CMRef Const)
 
 typeCheckInValueContext :: (TypeCheck a TypedExpression, HasPosition a) => Maybe Type -> a -> PreprocessorMonad (Expression, Value)
 typeCheckInValueContext t e = withinContext $ do

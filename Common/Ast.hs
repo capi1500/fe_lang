@@ -68,21 +68,17 @@ data Expression =
     BlockExpression [Statement] |
     IfExpression Expression Expression (Maybe Expression) | -- condition onTrue [onFalse]
     WhileExpression Expression Expression | -- condition, block
-    -- WhileExpression Expression Expression |
     -- ForExpression Pattern Expression Expression |
     -- MatchExpression Expression [MatchArm]
     InternalExpression (ExecutorMonad Value) |
     LiteralExpression Value |
     MakeArrayExpression [Expression] |
     MakeArrayDefaultsExpression Expression Expression | -- size, default
-    MakeClosureExpression [Identifier] Expression | -- params, expression
+    MakeClosureExpression [Capture] [Identifier] Expression | -- params, expression
     VariableExpression Identifier | -- ident, isRef
     ReferenceExpression Expression |
     DereferenceExpression Expression |
     -- StructExpression Ident [StructExpressionField]
-    -- ArrayExpressionItems [ArrayElement]
-    -- ArrayExpressionDefault Expression Expression |
-    -- ClousureExpression [Capture] [FunctionParam] FunctionReturnType Expression |
     -- FieldExpression Expression Ident |
     CallExpression BNFC'Position Expression [Expression] | -- ident, is_reference, expression
     IndexExpression BNFC'Position Expression Expression |
@@ -91,13 +87,10 @@ data Expression =
     -- TypeCastExpression Expression (Type) |
     I32DoubleOperatorExpression BNFC'Position NumericDoubleOperator Expression Expression |
     BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression |
-    -- LazyAndExpression Expression Expression |
-    -- LazyOrExpression Expression Expression |
     -- RangeExpression Expression Expression |
     AssignmentExpression Expression Expression | -- expression1, expression2
     BreakExpression |
     ContinueExpression |
-    -- ReturnExpressionUnit |
     ReturnExpression Expression
 
 data NumericDoubleOperator =
@@ -128,14 +121,12 @@ data Value =
     VUnit |
     VStruct (Map Identifier Pointer) |
     VVariant Int Pointer | -- value_tag, value
-    VFunction [Identifier] Expression | -- params, code
+    VFunction [ValueCapture] [Identifier] Expression | -- params, code
     VArray [Pointer] | -- values
     VReference Pointer |
     VVariable Pointer Variable -- pointer to self, value
 
--- instance CodePrint Variable where
---     codePrint tabs (Variable value) = codePrint tabs value
---     codePrint tabs Uninitialized = "null"
+data ValueCapture = CRef Pointer | CMove Pointer Variable
 
 isString :: [Value] -> Bool
 isString = all isChar

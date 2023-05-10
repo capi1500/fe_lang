@@ -19,6 +19,7 @@ import TypeCheck.State
 import TypeCheck.Variable
 import TypeCheck.BorrowCheckerUtils
 import TypeCheck.Printer
+import Common.Utils
 
 makeNewFrame :: Variables -> Variables
 makeNewFrame (Variables (Global global) variables) = Variables (Local (Global global) empty) variables
@@ -34,7 +35,7 @@ inNewFrame f = do
     putTypeDefinitions $ Local (typeDefinitions state) empty
     ret' <- f
     putPosition p
-    reproduceWithPersistent (variables state) state
+    reproduceWithPersistent state
     return ret'
 
 inNewScope :: PreprocessorMonad a -> PreprocessorMonad a
@@ -47,27 +48,30 @@ inNewScope f = do
     putTypeDefinitions $ Local (typeDefinitions state) empty
     ret <- f
     putPosition p
-    variables <- gets variables
-    reproduceWithPersistent variables state
+    reproduceWithPersistent state
     return ret
 
-reproduceWithPersistent :: Variables -> PreprocessorState -> PreprocessorMonad ()
-reproduceWithPersistent variables state = do
-    let map = getMap variables
+reproduceWithPersistent :: PreprocessorState -> PreprocessorMonad ()
+reproduceWithPersistent state = do
+    let Variables oldMappings oldVariables = variables state
+    Variables newMappings newVariables <- gets variables
+    let map = getMap newMappings
     traverse_ moveOutById (sortBy (flip compare) (elems map))
 
     warnings <- gets warnings
     LifetimeState _ id <- gets lifetimeState
 
     put state
-    putVariables variables
+
+    let variablesToReproduce = fmap snd (zip oldVariables newVariables)
+    putVariables $ Variables oldMappings variablesToReproduce
 
     LifetimeState lifetime _ <- gets lifetimeState
     putWarnings warnings
     putLifetimeState (LifetimeState lifetime id)
   where
-    getMap (Variables (Global map) _) = map
-    getMap (Variables (Local _ map) _) = map
+    getMap (Global map) = map
+    getMap (Local _ map) = map
 
 withinContext :: PreprocessorMonad a -> PreprocessorMonad a
 withinContext f = do

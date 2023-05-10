@@ -1,0 +1,18 @@
+fn main() {
+    var c = 5;
+    
+    var f = |&mut c|(x: i32) {
+        print_i32(c);
+        print_string(" ");
+        *c = x;
+        print_i32(c);
+        print_string("\n");
+    };
+    var g = | |(x: &Fn(i32), y: i32) {
+        x(y);
+    };
+
+    g(&f, 1);
+    g(&f, 2);
+    g(&f, 5);
+}

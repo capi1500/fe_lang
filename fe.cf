@@ -77,7 +77,8 @@ ArrayExpressionDefault. Expression16 ::= "[" Expression1 ";" Expression1 "]" ;
 ArrayElement. ArrayElement ::= Expression1 ;
 separator ArrayElement "," ;
 ClosureExpression. Expression16 ::= "|" [Capture] "|" "(" [FunctionParam] ")" FunctionReturnType Expression18 ;
-Capture. Capture ::= TypeModifier Ident ;
+Capture. Capture ::= Ident ;
+CaptureRef. Capture ::= TypeModifier Ident ;
 separator Capture "," ;
 
 FieldExpression. Expression15 ::= Expression15 "." Ident ;

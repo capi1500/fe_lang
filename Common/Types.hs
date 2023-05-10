@@ -10,16 +10,16 @@ data Type =
     TPrimitive PrimitiveType |
     TStruct [Field] |
     TVariant [Type] |
-    TFunction FunctionKind [Type] Type |
+    TFunction FunctionKind [Capture] [Type] Type |
     TArray Type |
     TReference Mutable Type
   deriving (Eq, Ord, Show, Read)
 
 -- can type1 be used as type2
 canSubstitute :: Type -> Type -> Bool
-canSubstitute (TFunction Fn params1 return1) (TFunction _ params2 return2) =
+canSubstitute (TFunction Fn _ params1 return1) (TFunction _ _ params2 return2) =
     all (uncurry canSubstitute) (zip params1 params2) && canSubstitute return1 return2
-canSubstitute (TFunction FnOnce params1 return1) (TFunction FnOnce params2 return2) =
+canSubstitute (TFunction FnOnce _ params1 return1) (TFunction FnOnce _ params2 return2) =
     all (uncurry canSubstitute) (zip params1 params2) && canSubstitute return1 return2
 canSubstitute (TReference Mutable t1) (TReference _ t2) = canSubstitute t1 t2
 canSubstitute (TReference Const t1) (TReference Const t2) = canSubstitute t1 t2
@@ -30,6 +30,12 @@ data PrimitiveType =
     Char |
     Bool |
     Unit
+  deriving (Eq, Ord, Show, Read)
+
+data Capture = Capture Identifier CaptureModifier
+  deriving (Eq, Ord, Show, Read)
+
+data CaptureModifier = CMRef Mutable | CMNone
   deriving (Eq, Ord, Show, Read)
 
 stringType :: Type
@@ -74,16 +80,16 @@ isFunction :: Type -> Bool
 isFunction TFunction {} = True
 isFunction _ = False
 
--- isFunction :: Type -> Bool
--- isNamedFunction (TFunction {}) = True
--- isNamedFunction _ = False
+isNamedFunction :: Type -> Bool
+isNamedFunction (TFunction _ [] _ _) = True
+isNamedFunction _ = False
 
 -- isClosure :: Type -> Bool
 -- isClosure (TFunction Unnamed _ _ _) = True
 -- isClosure _ = False
 
 isOnceFunction :: Type -> Bool
-isOnceFunction (TFunction FnOnce _ _) = True
+isOnceFunction (TFunction FnOnce _ _ _) = True
 isOnceFunction _ = False
 
 isReference :: Type -> Bool
@@ -108,7 +114,7 @@ getStricterOfFunctionKinds Fn Fn = Fn
 
 isCopy :: Type -> Bool
 isCopy (TPrimitive _) = True
-isCopy t = isFunction t
+isCopy t = isNamedFunction t
 
 data Field = Field Identifier Type
   deriving (Eq, Ord, Show, Read)
@@ -137,7 +143,7 @@ instance CodePrint Type where
     codePrint tabs (TPrimitive p) = show p
     codePrint tabs (TStruct _) = "struct"
     codePrint tabs (TVariant _) = "variant"
-    codePrint tabs (TFunction kind params ret) = show kind ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
+    codePrint tabs (TFunction kind captures params ret) = show kind ++ "(" ++ intercalate "," (fmap (codePrint tabs) params) ++ ") -> " ++ codePrint tabs ret
     codePrint tabs (TArray t) = "[" ++ codePrint tabs t ++ "]"
     codePrint tabs (TReference Const t) = "&" ++ codePrint tabs t
     codePrint tabs (TReference Mutable t) = "&mut " ++ codePrint tabs t

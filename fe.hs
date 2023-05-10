@@ -23,6 +23,7 @@ import Exec.State
 import Common.Printer
 import Common.AstPrinter
 import Data.List (intercalate)
+import Control.Monad (unless)
 
 type ParseFun a = [Token] -> Either String a
 
@@ -50,11 +51,9 @@ parse p s =
         putStrLn err
         exitFailure
     Right tree -> do
-        -- putStrLn "\nParsed tree\n"
-        -- print tree
         ast <- typeCheckStage tree
-        putStrLn "\nTypeChecked ast\n"
-        putStrLn (codePrint 0 ast)
+        putStrLn "TypeChecked ast\n"
+        putStr (codePrint 0 ast)
         executeStage ast
         return ()
     where
@@ -79,8 +78,10 @@ handleTypeCheckError (Right ast, state) = do
 
 printWarnings :: PreprocessorState -> IO ()
 printWarnings state = do
-    putStrLn "Warnings:"
-    putStrLn $ intercalate "\n" (fmap (codePrint 0) (reverse (warnings state)))
+    let warnings' = warnings state
+    unless (null warnings') $ do
+        putStrLn "Warnings:"
+        putStrLn $ intercalate "\n" (fmap (codePrint 0) (reverse (warnings state)))
 
 
 executeStage :: PreprocessorOutput -> IO ()

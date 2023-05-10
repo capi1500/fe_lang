@@ -63,3 +63,11 @@ setVariableId id (Variable createdAt variableIdentifier variableType _ const var
 setValueOwned :: Bool -> Value -> Value
 setValueOwned owned (Value t ownedPlaces borrows borrowsMut _) =
     Value t ownedPlaces borrows borrowsMut owned
+
+addBorrowToValue :: (VariableId, BNFC'Position) -> Value -> Value
+addBorrowToValue borrow (Value t ownedVariables borrows borrowsMut owned) =
+    Value t ownedVariables (borrow:borrows) borrowsMut owned
+
+addMutBorrowToValue :: (VariableId, BNFC'Position) -> Value -> Value
+addMutBorrowToValue borrow (Value t ownedVariables borrows borrowsMut owned) =
+    Value t ownedVariables borrows (borrow:borrowsMut) owned

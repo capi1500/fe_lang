@@ -18,20 +18,20 @@ import Data.ByteString (intercalate)
 
 makeInternalFunction :: Identifier -> [(Identifier, Type)] -> Type -> Expression -> (Identifier, Type, Value)
 makeInternalFunction name params return e =
-    let t = TFunction Fn (fmap snd params) return in
-    let v = VFunction (fmap fst params) e in
+    let t = TFunction Fn [] (fmap snd params) return in
+    let v = VFunction [] (fmap fst params) e in
     (name, t, v)
 
 internals :: [(Identifier, Type, Value)]
 internals = [
-        makeInternalFunction "print_i32" [("v", i32Type)] unitType (InternalExpression printFunction),
-        makeInternalFunction "print_char" [("v", charType)] unitType (InternalExpression printCharFunction),
-        makeInternalFunction "print_bool" [("v", boolType)] unitType (InternalExpression printFunction),
-        makeInternalFunction "print_string" [("v", stringType)] unitType (InternalExpression printStringFunction),
-        makeInternalFunction "input_i32" [] i32Type (InternalExpression inputI32Function),
-        makeInternalFunction "input_char" [] charType (InternalExpression inputCharFunction),
-        makeInternalFunction "input_bool" [] boolType (InternalExpression inputBoolFunction),
-        makeInternalFunction "input_string" [] stringType (InternalExpression inputStringFunction)
+        makeInternalFunction "print_i32" [("v", i32Type)] unitType (InternalExpression printFunction)
+        -- makeInternalFunction "print_char" [("v", charType)] unitType (InternalExpression printCharFunction),
+        -- makeInternalFunction "print_bool" [("v", boolType)] unitType (InternalExpression printFunction),
+        -- makeInternalFunction "print_string" [("v", stringType)] unitType (InternalExpression printStringFunction),
+        -- makeInternalFunction "input_i32" [] i32Type (InternalExpression inputI32Function),
+        -- makeInternalFunction "input_char" [] charType (InternalExpression inputCharFunction),
+        -- makeInternalFunction "input_bool" [] boolType (InternalExpression inputBoolFunction),
+        -- makeInternalFunction "input_string" [] stringType (InternalExpression inputStringFunction)
     ]
 
 printFunction :: ExecutorMonad Value

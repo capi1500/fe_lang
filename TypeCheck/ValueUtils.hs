@@ -21,8 +21,8 @@ makeValue p (TStruct fields) owned = do
 makeValue p (TVariant types) owned = do
     throw $ Other "Variants not yet implemented" p
     -- return $ Value p (TVariant name types) [] [] [] owned
-makeValue p (TFunction kind params ret) owned = do
-    return $ Value (TFunction kind params ret) [] [] [] owned
+makeValue p (TFunction kind captures params ret) owned = do
+    return $ Value (TFunction kind captures params ret) [] [] [] owned -- TODO: captures
 makeValue p (TArray t) owned = do
     inner <- makeValue p t True
     innerPlace <- addTemporaryVariable Mutable inner

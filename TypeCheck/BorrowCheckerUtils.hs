@@ -6,6 +6,8 @@ import Data.Maybe
 import Data.Foldable hiding (null)
 import Control.Monad.State
 
+import Fe.Abs (BNFC'Position)
+
 import Common.Types
 import Common.Printer
 
@@ -14,7 +16,6 @@ import TypeCheck.State
 import TypeCheck.Error
 import TypeCheck.VariablesUtils
 import TypeCheck.Printer
-import Fe.Abs (BNFC'Position)
 
 borrow :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
 borrow borrow' = borrowInternal borrow' markAsBorrowed
@@ -85,6 +86,19 @@ moveOut variable = do
         let value = variableValue variable
         when (owned value) $ dropValue value
         setVariableById (variableId variable) (setVariableState Moved variable)
+
+addBorrow :: Value -> VariableId -> Mutable -> PreprocessorMonad Value
+addBorrow value id mut = do
+    p <- gets position
+    var <- getVariableById id
+    let b = (id, p)
+    if mut == Mutable then do
+        borrowMut b
+        return $ addMutBorrowToValue b value
+    else do
+        borrow b
+        return $ addBorrowToValue b value
+
 
 makeBorrow :: VariableId -> Mutable -> PreprocessorMonad Value
 makeBorrow id mut = do

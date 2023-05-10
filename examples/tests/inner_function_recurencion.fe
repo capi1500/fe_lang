@@ -1,0 +1,11 @@
+fn main() {
+	fn fib(x: i32) -> i32 {
+		if (x <= 1) {
+			x
+		} else {
+			fib(x - 1) + fib(x - 2) // invalid, fib is not captured
+		}
+	}
+	
+	print_i32(fib(5));
+}

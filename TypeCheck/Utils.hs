@@ -91,10 +91,13 @@ getShorterOfLifetimesOrThrow p1 p2 first second = do
 -- assumes f1 and f2 are function types
 mergeFunctionTypesOrThrow :: A.BNFC'Position -> Type -> Type -> PreprocessorMonad Type
 mergeFunctionTypesOrThrow p f1 f2 = do
-    let TFunction kind1 params1 returnType1 = f1
-    let TFunction kind2 params2 returnType2 = f2
+    let TFunction kind1 captures1 params1 returnType1 = f1
+    let TFunction kind2 captures2 params2 returnType2 = f2
     when (params1 /= params2 || returnType1 /= returnType2) $ throw (TypeMismatch p f1 f2)
-    return $ TFunction (getStricterOfFunctionKinds kind1 kind2) params1 returnType1
+    return $ TFunction (getStricterOfFunctionKinds kind1 kind2) (mergeCaptures captures1 captures2) params1 returnType1
+  where
+    mergeCaptures captures1 captures2 = captures1 ++ captures2 -- TODO
+
 
 mergeVariables :: [Variable] -> [Variable] -> PreprocessorMonad [Variable]
 mergeVariables vars1 vars2 = do
@@ -141,15 +144,18 @@ nameOfItem (A.ItemStruct _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariant _ (A.Ident ident) _ _) = ident
 nameOfItem (A.ItemVariable _ _ (A.Ident ident) _ _) = ident
 
-stripReferences :: Value -> PreprocessorMonad (Expression -> Expression, Value)
-stripReferences value = do
+stripReferences :: Value -> Mutable -> PreprocessorMonad (Expression -> Expression, Value)
+stripReferences value req_mut = do
     helper (valueType value) value
     where
-        helper (TReference _ t) value = do
+        helper (TReference mut t) value = do
             do {
                 derefed <- deref value;
                 variable <- getVariableById derefed;
-                (e, v) <- stripReferences (variableValue variable);
+                (e, v) <- stripReferences (variableValue variable) req_mut;
+
+                when (req_mut == Mutable && not (isReference (valueType v)) && mut == Const) $ throw ( CannotTakeMutableReferenceToConstant Nothing derefed);
+
                 return (DereferenceExpression . e, v)
             } `catchError` handler
         helper t value = return (id, value)

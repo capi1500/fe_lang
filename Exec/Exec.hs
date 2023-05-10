@@ -1,30 +1,33 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Exec.Exec where
 
-import Common.Types
-import Control.Applicative (empty)
-import Common.Ast
-import Exec.State
-import Control.Monad.Except (MonadError(..), liftIO)
-import Data.Bits
-import Control.Monad (when, unless)
-import Exec.Utils
+import GHC.IO (catchAny, liftIO)
+
+import Prelude hiding (print)
 import Data.Maybe
-import Control.Monad.State (get)
+import Data.Bits
 import Data.Foldable (traverse_)
-import Exec.StateFunctions
+import Control.Exception
+import Control.Applicative (empty)
+import Control.Monad.Except (MonadError(..), liftIO)
+import Control.Monad (when, unless)
+import Control.Monad.State (get)
+
+import Fe.Abs (BNFC'Position)
+
+import Common.Ast
+import Common.Types
 import Common.Printer
 import Common.AstPrinter
 import Common.InternalFunctions
 import Common.Utils (listGet)
-import Fe.Abs (BNFC'Position)
-import Control.Exception
-import GHC.IO (catchAny, liftIO)
-import Prelude hiding (print)
+
+import Exec.State
+import Exec.Utils
+import Exec.StateFunctions
 
 class Executable a b where
     execute :: a -> ExecutorMonad b
@@ -35,7 +38,7 @@ instance Executable Code () where
         traverse_ (\(name, _, v) -> addVariable name (Variable v)) internals
         traverse_ initializeGlobalScope statements
         ExecutionState _ mainId _ _ <- get
-        (_, Variable (VFunction _ code)) <- getVariable mainFunction
+        (_, Variable (VFunction _ _ code)) <- getVariable mainFunction
         execute code :: ExecutorMonad Value
         return ()
 
@@ -56,7 +59,7 @@ instance Executable Statement Value where
         addVariable ident value
         return VUnit
     execute (NewFunctionStatement ident expression paramNames) = do
-        let value = Variable $ VFunction paramNames expression
+        let value = Variable $ VFunction [] paramNames expression
         addVariable ident value
         return VUnit
     execute (ExpressionStatement expression) = do
@@ -111,8 +114,9 @@ instance Executable Expression Value where
             addTmpVariable (Variable value)
             ) [1..size]
         return $ VArray pointers
-    execute (MakeClosureExpression params e) = do
-        return $ VFunction params e
+    execute (MakeClosureExpression captures params e) = do
+        -- TODO: captures
+        return $ VFunction [] params e
     execute (VariableExpression ident) = do
         (pointer, variable) <- getVariable ident
         return $ VVariable pointer variable
@@ -134,7 +138,8 @@ instance Executable Expression Value where
         return $ VVariable objectPointer variable
     execute (CallExpression p function_object params) = do
         putPosition p
-        VFunction param_names code <- execute function_object >>= varValue
+        VFunction captures param_names code <- execute function_object >>= varValue
+        -- TODO: captures
         params' <- traverse (\(i, e) -> do
             x <- execute e >>= varValue
             return (i, x)) (zip param_names params)
@@ -177,6 +182,13 @@ instance Executable Expression Value where
     execute (InternalExpression f) = do
         f
 
+instance Executable ValueCapture () where
+  execute (CRef ptr) = return ()
+  execute (CMove ptr var) = return ()
+
+instance Executable Capture () where
+  execute (Capture name modifier) = return ()
+
 doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doBooleanDoubleOperator Equals v1 v2 = do
     v1' <- deref v1
@@ -207,7 +219,7 @@ equals (VStruct a) (VStruct b) = do
     throwError $ Other "Not yet implemented: cmp of structs"
 equals (VVariant tag1 a) (VVariant tag2 b) = do
     throwError $ Other "Not yet implemented: cmp of variants"
-equals (VFunction _ _) (VFunction _ _) = do
+equals VFunction {} VFunction {} = do
     throwError $ TypeCheckerFailed "Cannot compare function values directly"
 equals (VArray a) (VArray b) = do
     if length a /= length b then do
