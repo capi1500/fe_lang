@@ -94,10 +94,8 @@ mergeFunctionTypesOrThrow p f1 f2 = do
     let TFunction kind1 captures1 params1 returnType1 = f1
     let TFunction kind2 captures2 params2 returnType2 = f2
     when (params1 /= params2 || returnType1 /= returnType2) $ throw (TypeMismatch p f1 f2)
-    return $ TFunction (getStricterOfFunctionKinds kind1 kind2) (mergeCaptures captures1 captures2) params1 returnType1
-  where
-    mergeCaptures captures1 captures2 = captures1 ++ captures2 -- TODO
-
+    unless (null captures1 && null captures2) $ throw (Other "Merging closures with captures not yet implemented" p)
+    return $ TFunction (getStricterOfFunctionKinds kind1 kind2) [] params1 returnType1
 
 mergeVariables :: [Variable] -> [Variable] -> PreprocessorMonad [Variable]
 mergeVariables vars1 vars2 = do

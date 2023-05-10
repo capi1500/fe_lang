@@ -260,12 +260,10 @@ instance TypeCheck A.Expression TypedExpression where
         params' <- traverse typeCheck params
         returnType' <- typeCheck returnType
 
-
-        let kind = Fn
         let paramTypes = fmap fst params'
         let paramIds = fmap snd params'
         let captureTypes = fmap (\(_, _, i, m) -> Capture i m) captures'
-        let functionType = TFunction kind captureTypes paramIds returnType'
+        let functionType = TFunction Fn captureTypes paramIds returnType'
 
         closureValue <- makeValue p functionType False
         let handleCapture = \closure (p, variable, _, captureModifier) -> do
@@ -279,8 +277,6 @@ instance TypeCheck A.Expression TypedExpression where
                 return closure
 
         closureValue <- foldM handleCapture closureValue captures'
-        printDebug $ "Closure: " ++ codePrint 1 closureValue
-
         let addFunctionParam = \(name, t) -> do
                 putPosition p
                 makeValue p t True >>= addVariable name Const
@@ -292,17 +288,20 @@ instance TypeCheck A.Expression TypedExpression where
                         | otherwise = t
                 makeValue p t' True >>= addVariable name Const
         putPosition p
-        (expression', actualType) <- inNewFrame $ do
+        (expression', actualType, kind) <- inNewFrame $ do
                 setCurrentFunction functionType
                 traverse_ addCapture captures'
                 traverse_ addFunctionParam params'
                 (expression', value) <- typeCheckInValueContext Nothing e
+                kind <- do { typeCheckInValueContext Nothing e; return Fn } `catchError` handle
                 unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
                 dropValue value
-                return (expression', valueType value)
-        printVariables
-        et <- createValueExpression closureValue
+                return (expression', valueType value, kind)
+
+        et <- createValueExpression (setValueType (TFunction kind captureTypes paramIds returnType') closureValue)
         return $ TypedExpression (MakeClosureExpression captureTypes paramTypes expression') et
+      where
+        handle e = return FnOnce
     typeCheck (A.CallExpression p function params) = do
         (function', functionId) <- typeCheckInPlaceContext Const function
 
@@ -317,7 +316,7 @@ instance TypeCheck A.Expression TypedExpression where
             return (functionType, borrowedValue, id)
         unless (isFunction functionType) $ do throw (ExpressionNotCallable p functionType)
 
-        let TFunction kind captures declaredParams returnType = functionType
+        let TFunction kind _ declaredParams returnType = functionType
         when (length params /= length declaredParams) $ throw (WrongNumberOfParams p functionType)
         let paramCheck = \(paramDeclaredType, A.CallParam _ param) -> do
             -- printDebug ("Param type: " ++ codePrint 1 paramDeclaredType)
@@ -326,9 +325,11 @@ instance TypeCheck A.Expression TypedExpression where
             dropValue paramValue -- TODO: for now, drop, transfer to return value when allowing for explicit lifetimes
             return paramExpression
 
-        -- TODO: captures
         params' <- traverse paramCheck (zip declaredParams params)
         dropValue borrowedValue
+
+        when (kind == FnOnce) $ moveOutById functionId
+
         -- TODO: for now, only static expressions (temporary and moved values) are returned
         et <- makeValue p returnType False >>= createValueExpression
         return $ TypedExpression (CallExpression p (mod function') params') et

@@ -22,7 +22,7 @@ makeValue p (TVariant types) owned = do
     throw $ Other "Variants not yet implemented" p
     -- return $ Value p (TVariant name types) [] [] [] owned
 makeValue p (TFunction kind captures params ret) owned = do
-    return $ Value (TFunction kind captures params ret) [] [] [] owned -- TODO: captures
+    return $ Value (TFunction kind captures params ret) [] [] [] owned -- does not add captures to the value
 makeValue p (TArray t) owned = do
     inner <- makeValue p t True
     innerPlace <- addTemporaryVariable Mutable inner
@@ -37,3 +37,7 @@ makeValue p (TReference Mutable t) owned = do
     innerPlace <- addTemporaryVariable Mutable inner
     borrowMut (innerPlace, p)
     return $ Value (TReference Mutable t) [] [] [(innerPlace, p)] owned
+
+setValueType :: Type -> Value -> Value
+setValueType t (Value _ ownedPlaces borrows borrowsMut owned) =
+    Value t ownedPlaces borrows borrowsMut owned
