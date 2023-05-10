@@ -115,8 +115,8 @@ instance Executable Expression Value where
             ) [1..size]
         return $ VArray pointers
     execute (MakeClosureExpression captures params e) = do
-        -- TODO: captures
-        return $ VFunction [] params e
+        captures' <- traverse execute captures
+        return $ VFunction captures' params e
     execute (VariableExpression ident) = do
         (pointer, variable) <- getVariable ident
         return $ VVariable pointer variable
@@ -139,7 +139,6 @@ instance Executable Expression Value where
     execute (CallExpression p function_object params) = do
         putPosition p
         VFunction captures param_names code <- execute function_object >>= varValue
-        -- TODO: captures
         params' <- traverse (\(i, e) -> do
             x <- execute e >>= varValue
             return (i, x)) (zip param_names params)
@@ -147,6 +146,10 @@ instance Executable Expression Value where
             traverse_ (\(paramIdent, paramValue) -> do
                 addVariable paramIdent (Variable paramValue))
                 params'
+            traverse_ (\(ValueCapture paramIdent paramValue) -> do
+                addVariable paramIdent (Variable paramValue)
+                )
+                captures
 
             do { execute code } `catchError` handler
         where
@@ -182,12 +185,13 @@ instance Executable Expression Value where
     execute (InternalExpression f) = do
         f
 
-instance Executable ValueCapture () where
-  execute (CRef ptr) = return ()
-  execute (CMove ptr var) = return ()
-
-instance Executable Capture () where
-  execute (Capture name modifier) = return ()
+instance Executable Capture ValueCapture where
+    execute (Capture name CMNone) = do
+        VVariable _ (Variable v) <- execute (VariableExpression name)
+        return $ ValueCapture name v
+    execute (Capture name (CMRef _)) = do
+        VVariable _ (Variable v) <- execute (ReferenceExpression (VariableExpression name))
+        return $ ValueCapture name v
 
 doBooleanDoubleOperator :: BooleanDoubleOperator -> Value -> Value -> ExecutorMonad Value
 doBooleanDoubleOperator Equals v1 v2 = do

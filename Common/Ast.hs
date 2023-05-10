@@ -126,7 +126,7 @@ data Value =
     VReference Pointer |
     VVariable Pointer Variable -- pointer to self, value
 
-data ValueCapture = CRef Pointer | CMove Pointer Variable
+data ValueCapture = ValueCapture Identifier Value
 
 isString :: [Value] -> Bool
 isString = all isChar
