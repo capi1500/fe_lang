@@ -1,10 +1,10 @@
-fn apply(f: Fn(&mut [i32], i32), row: &mut [i32], size: i32) {
-	f(row, size);
+fn apply(f: Fn(&mut [i32]), row: &mut [i32]) {
+	f(row);
 }
 
-fn print_row(row: &mut [i32], size: i32) {
+fn print_row(row: &mut [i32]) {
 	var i = 0;
-	while (i < size) {
+	while (i < length_i32(row)) {
 		print_i32(row[i]);
 		print_string("\t");
 		i += 1;
@@ -12,29 +12,24 @@ fn print_row(row: &mut [i32], size: i32) {
 	print_char('\n');
 }
 
-fn insert_row(row: &mut [i32], size: i32) {
+fn insert_row(row: &mut [i32]) {
 	var i = 0;
-	while (i < size) {
+	while (i < length_i32(row)) {
 		row[i] = i;
 		i += 1;
 	}
-}
+// }
 
 fn main() {
 	var tab = [5;[6;0]];
 	var i = 0;
 	while (i < 5) {
-		//apply(insert_row, &mut tab[i], 6);
-		var j = 0;
-		while (j < 6) {
-			tab[i][j] = i * 10 + j;
-			j += 1;
-		}
+		apply(insert_row, &mut tab[i], 6);
 		i += 1;
 	}
 	i = 0;
 	while (i < 5) {
-		apply(print_row, &mut tab[i], 6);
+		apply(print_row, &mut tab[i]);
 		i += 1;
 	}
 }

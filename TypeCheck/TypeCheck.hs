@@ -36,7 +36,6 @@ import TypeCheck.BorrowCheckerUtils
 import TypeCheck.Printer
 import TypeCheck.ValueUtils
 import TypeCheck.ContextUtils
-import Text.XHtml (variable)
 
 class TypeCheck a b where
     typeCheck :: a -> PreprocessorMonad b
@@ -80,7 +79,7 @@ addToScope (A.ItemFunction p (A.Ident ident) lifetimes params returnType _) = do
     declaredReturnType <- typeCheck returnType
     -- lifetimes' <- typeCheck lifetimes -- TODO: check explicit lifetimes
     let t = TFunction Fn [] params' declaredReturnType
-    makeValue p t True >>= addVariable ident Const
+    makeValue p t ByVariable >>= addVariable ident Const
     return ()
 addToScope (A.ItemStruct p ident lifetimes fields) = do
     putPosition p
@@ -125,7 +124,7 @@ instance TypeCheck A.Item Statement where
 
         let addFunctionParam = \(t, A.Parameter p (A.Ident name) _) -> do
                 putPosition p
-                makeValue p t True >>= addVariable name Const
+                makeValue p t ByVariable >>= addVariable name Const
                 return name
 
         putPosition p
@@ -160,10 +159,10 @@ instance TypeCheck A.Item Statement where
 
             when (declaredType /= TUntyped) $ assertType p declaredType initializedType
 
-            addVariable name mutability (setValueOwned True value)
+            addVariable name mutability (setValueOwned ByVariable value)
             return $ VarInitialized expression'
         else do
-            id <- addVariable name mutability (Value declaredType [] [] [] True)
+            id <- addVariable name mutability (Value declaredType [] [] [] ByVariable)
             mutateVariableById id (setVariableState Uninitialized)
             return VarUninitialized
 
@@ -175,7 +174,7 @@ instance TypeCheck A.Expression TypedExpression where
         putPosition p
         (statements', blockValue) <- inNewScope $ do
                 if null statements then do
-                    value <- makeValue p unitType False
+                    value <- makeValue p unitType ByExpression
                     return ([], value)
                 else do
                     let last:prefix = reverse statements
@@ -196,7 +195,7 @@ instance TypeCheck A.Expression TypedExpression where
                                 return (ExpressionStatement expression', blockValue)
                             s -> do
                                 s' <- typeCheck s
-                                value <- makeValue p unitType False
+                                value <- makeValue p unitType ByExpression
                                 return (s', value)
 
                     putPosition (hasPosition last)
@@ -222,7 +221,7 @@ instance TypeCheck A.Expression TypedExpression where
         -- TODO: should disable warnings, but not errors
         (block', blockValue) <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
         setInsideLoopExpression False
-        et <- makeValue p unitType False >>= createValueExpression
+        et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
     typeCheck (A.VariableExpression p (A.Ident name)) = do
         putPosition p
@@ -244,14 +243,14 @@ instance TypeCheck A.Expression TypedExpression where
         let t = valueType (head values)
         traverse_ (\t2 -> do unless (t == t2) $ throw (TypeMismatch p t t2)) (fmap valueType values)
 
-        et <- makeValue p (TArray t) False >>= createValueExpression
+        et <- makeValue p (TArray t) ByExpression >>= createValueExpression
         return $ TypedExpression (MakeArrayExpression expressions) et
     typeCheck (A.ArrayExpressionDefault p e1 e2) = do
         (e1', v1') <- typeCheckInValueContext (Just i32Type) e1
         (e2', v2') <- typeCheckInValueContext Nothing e2
 
         let innerType = valueType v2'
-        et <- makeValue p (TArray innerType) False >>= createValueExpression
+        et <- makeValue p (TArray innerType) ByExpression >>= createValueExpression
 
         return $ TypedExpression (MakeArrayDefaultsExpression e1' e2') et
     typeCheck (A.ClosureExpression p captures params returnType e) = do
@@ -265,7 +264,7 @@ instance TypeCheck A.Expression TypedExpression where
         let captureTypes = fmap (\(_, _, i, m) -> Capture i m) captures'
         let functionType = TFunction Fn captureTypes paramIds returnType'
 
-        closureValue <- makeValue p functionType False
+        closureValue <- makeValue p functionType ByExpression
         let handleCapture = \closure (p, variable, _, captureModifier) -> do
             putPosition p
             if captureModifier == CMRef Mutable then do
@@ -279,14 +278,14 @@ instance TypeCheck A.Expression TypedExpression where
         closureValue <- foldM handleCapture closureValue captures'
         let addFunctionParam = \(name, t) -> do
                 putPosition p
-                makeValue p t True >>= addVariable name Const
+                makeValue p t ByVariable >>= addVariable name Const
         let addCapture = \(p, variable, name, captureModifier) -> do
                 putPosition p
                 let t = variableType variable
                 let t'  | captureModifier == CMRef Mutable = TReference Mutable t
                         | captureModifier == CMRef Const = TReference Const t
                         | otherwise = t
-                makeValue p t' True >>= addVariable name Const
+                makeValue p t' ByVariable >>= addVariable name Const
         putPosition p
         (expression', actualType, kind) <- inNewFrame $ do
                 setCurrentFunction functionType
@@ -307,7 +306,7 @@ instance TypeCheck A.Expression TypedExpression where
 
         originalValue <- getVariableById functionId
         (functionType, borrowedValue, mod) <- if isReference (variableType originalValue) then do
-            dummy <- makeValue Nothing unitType False
+            dummy <- makeValue Nothing unitType ByExpression
             let TReference Const functionType = variableType originalValue
             return (functionType, dummy, DereferenceExpression)
         else do
@@ -331,7 +330,7 @@ instance TypeCheck A.Expression TypedExpression where
         when (kind == FnOnce) $ moveOutById functionId
 
         -- TODO: for now, only static expressions (temporary and moved values) are returned
-        et <- makeValue p returnType False >>= createValueExpression
+        et <- makeValue p returnType ByExpression >>= createValueExpression
         return $ TypedExpression (CallExpression p (mod function') params') et
     typeCheck (A.IndexExpression p e1 e2) = do
         context <- gets expressionContext
@@ -370,13 +369,13 @@ instance TypeCheck A.Expression TypedExpression where
         e' <- do
             (e', v) <- typeCheckInValueContext (Just i32Type) e
             return e'
-        expressionType <- makeValue p i32Type False >>= createValueExpression
+        expressionType <- makeValue p i32Type ByExpression >>= createValueExpression
         return $ TypedExpression (UnaryMinusExpression e') expressionType
     typeCheck (A.UnaryExpression _ (A.UnaryNegation p) e) = do
         e' <- do
             (e', v) <- typeCheckInValueContext (Just boolType) e
             return e'
-        expressionType <- makeValue p boolType False >>= createValueExpression
+        expressionType <- makeValue p boolType ByExpression >>= createValueExpression
         return $ TypedExpression (UnaryNegationExpression e') expressionType
     typeCheck (A.UnaryExpression _ (A.Dereference p) e) = do
         context <- gets expressionContext
@@ -404,11 +403,15 @@ instance TypeCheck A.Expression TypedExpression where
             return $ TypedExpression (DereferenceExpression e') (PlaceType mutability derefedPlaceId)
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         (e', borrowedId) <- typeCheckInPlaceContext Const e
+        borrowed <- getVariableById borrowedId
+        when (isOnceFunction (variableType borrowed)) $ throw (CannotBorrowFnOnce p borrowedId)
         v <- makeBorrow borrowedId Const
         et <- createValueExpression v
         return $ TypedExpression (ReferenceExpression e') et
     typeCheck (A.UnaryExpression _ (A.ReferenceMut p) e) = do
         (e', borrowedId) <- typeCheckInPlaceContext Mutable e
+        borrowed <- getVariableById borrowedId
+        when (isOnceFunction (variableType borrowed)) $ throw (CannotBorrowFnOnce p borrowedId)
         v <- makeBorrow borrowedId Mutable
         et <- createValueExpression v
         return $ TypedExpression (ReferenceExpression e') et
@@ -444,18 +447,18 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.BreakExpression p) = do
         context <- gets context
         unless (insideLoopExpression context) $ throw (BreakNotInLoop p)
-        et <- makeValue p unitType False >>= createValueExpression
+        et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression BreakExpression et
     typeCheck (A.ContinueExpression p) = do
         context <- gets context
         unless (insideLoopExpression context) $ throw (ContinueNotInLoop p)
-        et <- makeValue p unitType False >>= createValueExpression
+        et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression ContinueExpression et
     typeCheck (A.ReturnExpressionUnit p) = do
         context <- gets context
         let TFunction _ _ _ currentFunctionReturnType = currentFunction context
         assertType p unitType currentFunctionReturnType
-        et <- makeValue p unitType False >>= createValueExpression
+        et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (ReturnExpression (LiteralExpression VUnit)) et
     typeCheck (A.ReturnExpressionValue p e) = do
         context <- gets context
@@ -470,7 +473,7 @@ makeI32DoubleOperatorExpression :: A.BNFC'Position -> A.Expression -> A.Expressi
 makeI32DoubleOperatorExpression p e1 e2 operator = do
     (e1', v1) <- typeCheckInValueContext (Just i32Type) e1
     (e2', v2) <- typeCheckInValueContext (Just i32Type) e2
-    expressionType <- makeValue p i32Type False >>= createValueExpression
+    expressionType <- makeValue p i32Type ByExpression >>= createValueExpression
     dropValue v1
     dropValue v2
     return $ TypedExpression (I32DoubleOperatorExpression p operator e1' e2') expressionType
@@ -487,7 +490,7 @@ makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     let TReference _ innerT = valueType v1
     when (isFunction innerT) $ throw (CannotCompareFunctions innerT)
 
-    expressionType <- makeValue p boolType False >>= createValueExpression
+    expressionType <- makeValue p boolType ByExpression >>= createValueExpression
     dropValue v1
     dropValue v2
     return $ TypedExpression (BoolDoubleOperatorExpression Equals e1' e2') expressionType
@@ -514,7 +517,7 @@ makeI32ComparisonExpression e1 e2 operator = do
 
     assertType (hasPosition e1) (valueType v1) (TReference Const i32Type) -- here its a reference to int vs int
     assertType (hasPosition e2) (valueType v2) (TReference Const i32Type)
-    expressionType <- makeValue (hasPosition e1) boolType False >>= createValueExpression
+    expressionType <- makeValue (hasPosition e1) boolType ByExpression >>= createValueExpression
     dropValue v1
     dropValue v2
     endStatement
@@ -543,9 +546,9 @@ makeAssignmentExpression (A.Assign p) e1 e2 = do
     assertType p t1 t2
 
     when (variableState place == Uninitialized) $ mutateVariableById placeId (setVariableState Free)
-    mutateVariableById placeId (mutateVariableValue (const (setValueOwned True newValue)))
+    mutateVariableById placeId (setVariableValue (setValueOwned ByVariable newValue))
 
-    et <- makeValue (hasPosition e1) unitType False >>= createValueExpression
+    et <- makeValue (hasPosition e1) unitType ByExpression >>= createValueExpression
     return $ TypedExpression (AssignmentExpression e1' e2') et
 
 makeCompoundAssignmentExpression :: NumericDoubleOperator -> A.Expression -> A.Expression -> PreprocessorMonad TypedExpression
@@ -563,7 +566,7 @@ makeCompoundAssignmentExpression op e1 e2 = do
 
     when (variableState place == Uninitialized) $ throw (UninitializedVariableUsed p placeId)
 
-    et <- makeValue p unitType False >>= createValueExpression
+    et <- makeValue p unitType ByExpression >>= createValueExpression
     return $ TypedExpression (AssignmentExpression e1' (I32DoubleOperatorExpression p op (DereferenceExpression e1') e2')) et
 
 instance TypeCheck A.IfExpression TypedExpression where
@@ -593,7 +596,7 @@ ifExpression p condition onTrue onFalse = do
     putVariables $ Variables mappings variablesBeforeIf
     (onFalse', onFalseValue) <- do
         if isNothing onFalse then do
-            value <- makeValue p unitType False
+            value <- makeValue p unitType ByExpression
             return (Nothing, value)
         else do
             (onFalse', onFalseValue) <- typeCheckInValueContext Nothing (fromJust onFalse)
@@ -616,7 +619,7 @@ ifExpression p condition onTrue onFalse = do
         ownedPlaces = ownedPlaces onTrueValue ++ ownedPlaces onFalseValue,
         borrows = borrows onTrueValue ++ borrows onFalseValue,
         borrowsMut = borrowsMut onTrueValue ++ borrowsMut onFalseValue,
-        owned = False
+        owned = ByExpression
     }
     putPosition p
     traverse_ borrow (borrows value)
@@ -627,19 +630,19 @@ ifExpression p condition onTrue onFalse = do
 instance TypeCheck A.Literal TypedExpression where
     typeCheck :: A.Literal -> PreprocessorMonad TypedExpression
     typeCheck (A.LiteralChar p char) = do
-        valueExpression <- makeValue p charType False >>= createValueExpression
+        valueExpression <- makeValue p charType ByExpression >>= createValueExpression
         return $ TypedExpression (LiteralExpression $ VChar char) valueExpression
     typeCheck (A.LiteralString p string) = do
-        valueExpression <- makeValue p (TArray charType) False >>= createValueExpression
+        valueExpression <- makeValue p (TArray charType) ByExpression >>= createValueExpression
         return $ TypedExpression (MakeArrayExpression (fmap (LiteralExpression . VChar) string)) valueExpression
     typeCheck (A.LiteralInteger p integer) = do
-        valueExpression <- makeValue p i32Type False >>= createValueExpression
+        valueExpression <- makeValue p i32Type ByExpression >>= createValueExpression
         return $ TypedExpression (LiteralExpression $ VI32 (fromIntegral integer)) valueExpression
     typeCheck (A.LiteralBoolean p (A.BoolTrue _)) = do
-        valueExpression <- makeValue p boolType False >>= createValueExpression
+        valueExpression <- makeValue p boolType ByExpression >>= createValueExpression
         return $ TypedExpression (LiteralExpression $ VBool True) valueExpression
     typeCheck (A.LiteralBoolean p (A.BoolFalse _)) = do
-        valueExpression <- makeValue p boolType False >>= createValueExpression
+        valueExpression <- makeValue p boolType ByExpression >>= createValueExpression
         return $ TypedExpression (LiteralExpression $ VBool False) valueExpression
 
 instance TypeCheck A.ArrayElement TypedExpression where

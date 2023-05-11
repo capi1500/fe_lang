@@ -85,7 +85,7 @@ makeInternalFunction id name t = Variable {
         ownedPlaces = [],
         borrows = [],
         borrowsMut = [],
-        owned = True
+        owned = ByVariable
     },
     lifetime = staticLifetime
 }

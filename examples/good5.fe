@@ -1,12 +1,12 @@
 fn main() {
-    const table: [i32;10] = [10;0];
+    const table: [i32] = [10;0];
 	var i = 0;
 	while (i < 10) {
 		print_i32(table[i]);
 		i += 1;
 	}
 	
-	var multi_table: [[i32;10];5] = [[0;5];10];
+	var multi_table: [[i32]] = [10;[5;0]];
 	var x = 0;
 	var y = 0;
 	for (row in multi_table) {

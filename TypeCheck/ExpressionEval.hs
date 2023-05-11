@@ -61,6 +61,11 @@ internalCreatePlaceExpression variableId (ValueContext expectedType) = do
                 printDebug $ "implicit deref " ++ codePrint 1 derefedVariable;
                 return (DereferenceExpression, ValueType (variableValue derefedVariable))
             } `catchError` handler variable
+        else if isReference t && canSubstitute (variableType variable) t then do
+            let value = setValueOwned (ByBorrow variableId) (variableValue variable)
+            unless (isCopy (variableType variable)) $ mutateVariableById variableId (setVariableValue value)
+            moveOutById variableId -- will be recreated from value later
+            return (id, ValueType value)
         else do
             def variable
     else def variable
@@ -68,8 +73,8 @@ internalCreatePlaceExpression variableId (ValueContext expectedType) = do
     def variable = do
         p <- gets position
         forM_ expectedType (assertType p (variableType variable))
-        let value = setValueOwned False (variableValue variable)
-        unless (isCopy (variableType variable)) $ mutateVariableById variableId (mutateVariableValue (setValueOwned False))
+        let value = setValueOwned ByExpression (variableValue variable)
+        unless (isCopy (variableType variable)) $ mutateVariableById variableId (setVariableValue value)
         moveOutOrCopyById variableId
         return (id, ValueType value)
     handler variable (CannotDerefReferenceToMultipleVariables _) = def variable

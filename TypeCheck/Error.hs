@@ -27,6 +27,7 @@ data PreprocessorError =
     UseAfterMoved BNFC'Position VariableId |
     AssignmentToConstant BNFC'Position VariableId |
     AlreadyBorrowed BNFC'Position VariableId |
+    CannotBorrowFnOnce BNFC'Position VariableId |
     CannotMoveOut BNFC'Position Variable |
     LifetimesMismatch BNFC'Position BNFC'Position Lifetime Lifetime | -- if position is nothing -> lifetime is static
     CannotMakeEmptyReference BNFC'Position |

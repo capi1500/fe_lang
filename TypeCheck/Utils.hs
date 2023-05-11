@@ -107,7 +107,7 @@ mergeVariables vars1 vars2 = do
         state <- mergeStates p (variableId v1) (variableState v1) (variableState v2)
         let value = mergeValues (variableValue v1) (variableValue v2)
         let vState = setVariableState state v1
-        let vValue = mutateVariableValue (const value) vState
+        let vValue = setVariableValue value vState
         return vValue
 
     mergeStates p id Uninitialized Uninitialized = return Uninitialized

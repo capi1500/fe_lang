@@ -84,7 +84,7 @@ moveOut variable = do
     else  do
         unless (state == Free) $ throw (CannotMoveOut p variable)
         let value = variableValue variable
-        when (owned value) $ dropValue value
+        when (owned value == ByVariable) $ dropValue value
         setVariableById (variableId variable) (setVariableState Moved variable)
 
 addBorrow :: Value -> VariableId -> Mutable -> PreprocessorMonad Value
@@ -113,7 +113,7 @@ makeBorrow id mut = do
             ownedPlaces = [],
             borrows = [(id, p)],
             borrowsMut = [],
-            owned = True
+            owned = ByVariable
         }
     doBorrow p Mutable t = do
         borrowMut (id, p)
@@ -122,20 +122,27 @@ makeBorrow id mut = do
             ownedPlaces = [],
             borrows = [],
             borrowsMut = [(id, p)],
-            owned = True
+            owned = ByVariable
         }
 
 
 makeImplicitBorrowValue :: VariableId -> Mutable -> PreprocessorMonad Value
 makeImplicitBorrowValue id mutability = do
     value <- makeBorrow id mutability
-    return (setValueOwned False value)
+    return (setValueOwned ByExpression value)
 
 dropValue :: Value -> PreprocessorMonad ()
 dropValue value = do
-    traverse_ moveOutById (ownedPlaces value)
-    traverse_ removeBorrow (borrows value)
-    traverse_ removeBorrowMut (borrowsMut value)
+    if isOwnershipByBorrow (owned value) then do
+        let ByBorrow id = owned value
+        var <- getVariableById id
+        let var' = setVariableState Free var
+        let var'' = setVariableValue (setValueOwned ByVariable value) var'
+        setVariableById id var''
+    else do
+        traverse_ moveOutById (ownedPlaces value)
+        traverse_ removeBorrow (borrows value)
+        traverse_ removeBorrowMut (borrowsMut value)
   where
     removeBorrow :: (VariableId, BNFC'Position) -> PreprocessorMonad ()
     removeBorrow borrow = do

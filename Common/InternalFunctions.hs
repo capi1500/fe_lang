@@ -31,7 +31,9 @@ internals = [
         makeInternalFunction "input_i32" [] i32Type (InternalExpression inputI32Function),
         makeInternalFunction "input_char" [] charType (InternalExpression inputCharFunction),
         makeInternalFunction "input_bool" [] boolType (InternalExpression inputBoolFunction),
-        makeInternalFunction "input_string" [] stringType (InternalExpression inputStringFunction)
+        makeInternalFunction "input_string" [] stringType (InternalExpression inputStringFunction),
+        makeInternalFunction "length_i32" [("v", TReference Const (TArray i32Type))] i32Type (InternalExpression lengthFunction),
+        makeInternalFunction "length_string" [("v", TReference Const stringType)] i32Type (InternalExpression lengthFunction)
     ]
 
 printFunction :: ExecutorMonad Value
@@ -100,8 +102,8 @@ inputCharFunction = do
             return h
     return $ VChar c
 
--- lengthFunction :: ExecutorMonad Value
--- lengthFunction = do
---     (_, Variable (VReference ptr)) <- getVariable "v"
---     Variable (VArray lst) <- getVariableById ptr
---     return $ VI32 (length lst)
+lengthFunction :: ExecutorMonad Value
+lengthFunction = do
+    (_, Variable (VReference ptr)) <- getVariable "v"
+    Variable (VArray lst) <- getVariableById ptr
+    return $ VI32 (length lst)
