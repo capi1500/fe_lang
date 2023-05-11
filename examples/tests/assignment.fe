@@ -1,7 +1,0 @@
-fn main() {
-    var x: i32;
-    var y = 4;
-    x = y;
-    y = 10;
-    print_i32(x);
-}

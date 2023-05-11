@@ -1,0 +1,14 @@
+fn main() {
+	var x = 0;
+	while (true) {
+		x += 1;
+		if (x == 2) {
+			continue;
+		}
+		if (x % 2 == 0) {
+			break;
+		}
+		print_i32(x);
+		print_string("\n");
+	}
+}

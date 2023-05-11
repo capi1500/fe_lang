@@ -1,0 +1,10 @@
+fn main() {
+	var i = 0;
+	var x = 4;
+	var y = &x;
+	while (i < 10) {
+		print_i32(*y);
+		print_string("\n");
+		i = i + 1;
+	}
+}

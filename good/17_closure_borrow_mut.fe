@@ -1,0 +1,19 @@
+fn main() {
+    var c = 5;
+    
+    var f = |&mut c|(x: i32) {
+        print_string("Before: ");
+        print_i32(c);
+        *c = x;
+        print_string(", After: ");
+        print_i32(c);
+        print_string("\n");
+    };
+    var g = | |(x: &Fn(i32), y: i32) {
+        x(y);
+    };
+
+    g(&f, 1);
+    g(&f, 2);
+    g(&f, 10);
+}

@@ -1,0 +1,12 @@
+fn main() {
+	print_bool(1 == 1);
+	print_string("\n");
+	print_bool(true == false);
+	print_string("\n");
+	print_bool('6' != '2');
+	print_string("\n");
+	print_bool("Hello" == "There");
+	print_string("\n");
+	print_bool([1, 2, 3] == [1, 2, 3]);
+	print_string("\n");
+}

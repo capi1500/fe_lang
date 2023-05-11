@@ -1,9 +1,11 @@
 import System.Environment ( getArgs )
 import System.Exit        ( exitFailure )
-import Control.Monad      ( when, return )
+import System.IO (hPutStrLn, stderr)
+import Control.Monad ( when, unless )
 import Control.Monad.State (runState, StateT (runStateT), MonadIO (liftIO))
 import Control.Monad.Except (runExceptT, runExcept)
 import Data.Either
+import Data.List (intercalate)
 
 import qualified Fe.Abs as A
 import Fe.Lex   ( Token, mkPosToken )
@@ -13,17 +15,15 @@ import Fe.Skel  ()
 
 import Common.Ast
 import Common.Utils
-
-import TypeCheck.TypeCheck (typeCheck)
-import TypeCheck.Error (PreprocessorError)
-import TypeCheck.State (PreprocessorState (PreprocessorState, warnings), makePreprocessorState)
+import Common.Printer
+import Common.AstPrinter
 
 import Exec.Exec
 import Exec.State
-import Common.Printer
-import Common.AstPrinter
-import Data.List (intercalate)
-import Control.Monad (unless)
+
+import TypeCheck.TypeCheck (typeCheck)
+import TypeCheck.Error (PreprocessorError, debug)
+import TypeCheck.State (PreprocessorState (PreprocessorState, warnings), makePreprocessorState)
 
 type ParseFun a = [Token] -> Either String a
 
@@ -36,26 +36,26 @@ main = do
 
 usage :: IO ()
 usage = do
-    putStrLn $ unlines [
+    printErr $ unlines [
         "usage: Call with one of the following argument combinations:",
         "  --help          Display this help message.",
-        "  (file)          Parse content of files verbosely."]
+        "  (file)          Execute a file."]
 
 parse :: ParseFun A.Code -> String -> IO ()
 parse p s =
     case p ts of
     Left err -> do
-        putStrLn "\nParse              Failed...\n"
-        putStrLn "Tokens:"
-        mapM_ (putStrLn . showPosToken . mkPosToken) ts
-        putStrLn err
+        printErr "\nParse              Failed...\n"
+        printErr "Tokens:"
+        mapM_ (printErr . showPosToken . mkPosToken) ts
+        printErr err
         exitFailure
     Right tree -> do
         ast <- typeCheckStage tree
-        putStrLn "TypeChecked ast\n"
-        putStr (codePrint 0 ast)
+        when debug $ do
+            printErr "TypeChecked ast\n"
+            printErr $ codePrint 0 ast
         executeStage ast
-        return ()
     where
     ts = myLexer s
     showPosToken ((l,c),t) = concat [ show l, ":", show c, "\t", show t ]
@@ -68,9 +68,9 @@ typeCheckStage code =
 
 handleTypeCheckError :: (Either PreprocessorError Code, PreprocessorState) -> IO PreprocessorOutput
 handleTypeCheckError (Left err, state) = do
-    putStrLn "Error in type checker"
+    printErr "Error in type checker"
     printWarnings state
-    print err
+    printErr $ show err
     exitFailure
 handleTypeCheckError (Right ast, state) = do
     printWarnings state
@@ -80,8 +80,8 @@ printWarnings :: PreprocessorState -> IO ()
 printWarnings state = do
     let warnings' = warnings state
     unless (null warnings') $ do
-        putStrLn "Warnings:"
-        putStrLn $ intercalate "\n" (fmap (codePrint 0) (reverse (warnings state)))
+        printErr "Warnings:"
+        printErr $ intercalate "\n" (fmap (codePrint 0) (reverse warnings'))
 
 
 executeStage :: PreprocessorOutput -> IO ()
@@ -93,11 +93,14 @@ executeStage code = do
 
 handleExecutionError :: Either ExecutionError () -> IO ()
 handleExecutionError (Left err) = do
-    putStrLn "Error during execution"
-    print err
+    printErr "Error during execution"
+    printErr $ show err
     exitFailure
 handleExecutionError (Right _) = do
     return ()
 
 runFile :: ParseFun A.Code -> FilePath -> IO ()
 runFile p f = readFile f >>= parse p
+
+printErr :: String -> IO ()
+printErr = hPutStrLn stderr

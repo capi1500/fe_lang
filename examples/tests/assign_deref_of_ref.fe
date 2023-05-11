@@ -1,7 +1,0 @@
-fn main() -> i32 {
-    var a = 1;
-    var b = &mut a;
-    var c = &mut b;
-    var d = *c; // fails, same as rust
-    *d
-}

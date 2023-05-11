@@ -77,11 +77,19 @@ moveOut :: Variable -> PreprocessorMonad ()
 moveOut variable = do
     p <- gets position
     let state = variableState variable
+    let
     if state == Moved then do
         return ()
     else if state == Uninitialized then do
         addWarning $ VariableNotInitializedNotUsed (variableId variable)
-    else  do
+    else do
+        global <- if isJust (variableName variable) then do
+                isGlobalVariable (fromJust (variableName variable))
+            else do
+                return False
+        if global then do
+            throw $ CannotMoveOut p variable
+        else do
         unless (state == Free) $ throw (CannotMoveOut p variable)
         let value = variableValue variable
         when (owned value == ByVariable) $ dropValue value

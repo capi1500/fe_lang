@@ -1,8 +1,0 @@
-fn main() {
-	var a = 4;
-	var b = &a;
-	if (false) {
-		print_i32(*b);
-	} else {}
-	print_i32(*b);
-}

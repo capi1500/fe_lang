@@ -1,0 +1,223 @@
+# Opis języka
+
+## Tabelka cech
+# Tabelka cech
+Na 15 punktów
+- 01 + (trzy typy)
+- 02 + (literały, arytmetyka, porównania)
+- 03 + (zmienne, przypisanie)
+- 04 + (print)
+- 05 + (while, if)
+- 06 + (funkcje lub procedury, rekurencja)
+- 07 + (przez zmienną / przez wartość / in/out)
+- 08 + (zmienne read-only i pętla for)
+
+Na 20 punktów
+- 09 + (przesłanianie i statyczne wiązanie)
+- 10 + (obsługa błędów wykonania)
+- 11 + (funkcje zwracające wartość)
+
+Na 30 punktów
+- 12 + (4) (statyczne typowanie)
+- 13 + (2) (funkcje zagnieżdżone ze statycznym wiązaniem)
+- 14 + (1/2) (rekordy/listy/tablice/tablice wielowymiarowe) - tablice, tablice wielowymiarowe
+- 15 - (2) (krotki z przypisaniem)
+- 16 + (1) (break, continue)
+- 17 + (4) (funkcje wyższego rzędu, anonimowe, domknięcia)
+- 18 - (3) (generatory)
+
+Dodatkowo:
+- 19 ownership-based memory model
+- 20 statyczna analiza poprawności pamięciowej - borrow checker
+- 21 częściowa rekonstrukcja typów
+
+## Zaimplementowane
+- Typy:
+  - i32
+  - char
+  - bool
+  - statyczne tablice - oznaczenie `[T]`
+  - string - reprezentowane jako tablica znaków: `[char]`
+  - referencje/pożyczenia - oznaczenie `&T`
+  - referencje/pożyczenia mutowalne - oznaczenie `&mut T`
+  - typy funkcyjne - oznaczenie `Fn(T1, T2, ...) -> R` - funkcje, które mogą być wywoływane dowolnie wiele razy
+  - typy funkcyjne jednokrotnego wywołania - oznaczenie `FnOnce(T1, T2, ...) -> R` - funkcje, które ze względu na swoją definicje mogą zostać wykonane tylko raz
+  - unit - odpowiednik `void`, typ jedynie wewnętrzny - oznaczenie `()`
+- Statements:
+  - `;` - puste wyrażenie służące do oddzielania wyrażeń
+  - statement wyrażeniowy - `e` - gdzie `e` to wyrażenie
+  - deklaracja zmiennej - `var ident: T = e` - gdzie:
+    - `ident` to nazwa nowej zmiennej
+    - `: T` to jawna deklaracja typu zmiennej
+    - `= e` to inicjalizacja zmiennej na wartość wyrażenia `e`  
+    Wystarczy jeśli występuje albo deklaracja typu, albo inicjalizacja (ale można podać oba)  
+    Zmienne mogą mieć typ `&T`. Wtedy można zmienić trzymaną referencję, ale wartości pod refrerencją już nie.
+  - deklaracja stałej - `const ident: T = e` - gdzie:
+    - `ident` to nazwa nowej zmiennej
+    - `: T` to jawna deklaracja typu zmiennej
+    - `= e` to inicjalizacja stałej na wartość wyrażenia `e`  
+    Deklaracja typu jest opcjonalna, ale nie inicjalizacja.  
+    Stałe mogą mieć typ `&mut T`. Wtedy nie można zmienić trzymanej referencji, ale wartość pod refrerencją już tak.
+  - deklaracja funkcji - `fn ident(a1: T1, ...) -> R e` - gdzie:
+    - `ident` to nazwa nowej funkcji.
+    - `ai` to nazwa parametru o typie `Ti`. Parametry są traktowane jak stałe.
+    - `-> R` to deklaracja typu zwracanego przez funkcję, jeśli brak, funkcja zwraca `R = ()`.
+    - `e` to wyrażenie blokowe zwracające typ `R`.  
+    Typ funkcji to `Fn(T1, T2...) -> R`
+- Wyrażenia:
+  - literały:
+    - liczbowe - `i32`
+    - znakowe - `char`
+    - boolowskie - `true` i `false` - `bool`
+    - napisy - skrót notacyjny na tablice `[char]`
+  - arytmetyczne (`+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `|`, `^`, `&`) - zakładają, że oba argumenty są typu `i32`. . Zwracają `i32`.
+  - boolowskie (`<`, `>`, `<=`, `>=`, `||`, `&&`) - zakładają, że oba argumenty są typu `bool`. Zwracają `bool`.
+  - unarny `-e` - gdzie `e` jest wyrażeniem zwracającym `i32`. Zwraca `i32`
+  - unarny `!e` - gdzie `e` jest wyrażeniem zwracającym `bool`. Zwraca `bool`
+  - porównanie `==` - zakłada, że oba argumenty są takiego samego typu, ale nie są typu funkcyjnego.  
+    Referencje są porównywane jak wskaźniki w C, tablice najpierw po długości, a następnie element po elemencie.  
+    Zwraca `bool`.
+  - wywołanie funkcji - `f(e1, e2, ...)`
+    - `f` może być wyrażeniem zwracającym typ funkcyjny `F`, bądź referencję na typ funkcyjny `F`.
+    - `ei` to wyrażenia zwracające typy wymagane przez funkcję  
+    Jeśli `F = Fn(...) -> R` lub `F = FnOnce(...) -> R`, to wyrażenie zwraca typ `R`
+  - stworzenie tablicy z elementów - `[e1, e2, ...]` - `ei` to wyrażenia zwracające ten sam typ `T`. Powstała tablica ma typ `[T]`
+  - stworzenie tablicy z wielkości i domyślnego elementu - `[s; e]`
+    - `s` to wyrażenie zwracające `i32`
+    - `e` to wyrażenie zwracające typ `T`  
+    Powstała tablica ma typ `[T]`
+  - range - `e1..e2` - `e1` i `e2` to wyrażenia zwracające `i32`.  
+  Zwraca tablicę typu `[i32]` składającą się z elementów od `e1` do `e2` (malejące lub rosnące w zależności czy `e1 < e2`) włącznie.
+  - indeks tablicy - `t[e]`
+    - `t` to wyrażenie zwracające dowolnie zagnieżdżony w referencjach typ tablicowy `[T]`.
+    - `e` to wyrażenie zwracające `i32`  
+    zwraca typ `T`
+  - wyrażenie zmiennej - `ident` 
+    - `ident` jest zmienną widoczną w aktualnym bloku.  
+    Zarówno zmienne dodane przez `var ident`, stałe `const ident` jak i funkcje `fn ident(...)` są traktowane jako zmienne (różnych typów i niekoniecznie mogą się zmieniać (`const`))
+  - referencja - `&e` - dla `e` typu `T` zwraca typ `&T` - dokładniejszy opis przy opisie obliczania wyrażeń
+  - referencja mutowalna - `&mut e` - dla `e` typu `T` zwraca typ `&mut T` - dokładniejszy opis przy opisie obliczania wyrażeń
+  - dereferencja - `*e` - dla `e` typu `&T` zwraca typ `T` - dokładniejszy opis przy opisie obliczania wyrażeń
+  - przypisanie - `e1 = e2` - zakłada, że `e1` zwraca ten sam typ co `e2` - dokładniejszy opis przy opisie obliczania wyrażeń
+  - przypisanie z operacją - np. `e1 += e2` - zakłada, że `e1` zwraca ten sam typ co `e2` - dokładniejszy opis przy opisie obliczania wyrażeń
+  - `break`, `continue` - wyrażenia analogiczne do tych z C, legalne jedynie wewnątrz bloku `while` lub `for`
+  - `return`, `return e` - zwracają odpowiedno `()` bądź typ zwracany przez wyrażenie `e`. Zakłada, że zwracany typ jest zgodny z typem oczekiwanym przez aktualnie wykonywaną funkcję
+  - if - `if (c) e1 else e2`, `if (c) e` - gdzie
+   - `c` jest wyrażeniem zwracającym `bool`
+   - `e1`, `e2` są wyrażeniami blokowymi zwracającymi ten sam typ `T` (występują pewne ograniczenia, więcej niżej), bądź `e` zwracające typ `T`.  
+   Wyrażenie zwraca typ `T`
+  - while - `while (c) e` - gdzie 
+    - `c` jest wyrażeniem zwracającym `bool`
+    - `e` jest wyrażeniem blokowym zwracającym `()`  
+    Wyrażenie zwraca `()`.
+  - for - `for (ident in e1) e2` - gdzie
+    - `ident` jest nową stałą
+    - `e1` wyrażeniem zwracającym typ tablicowy (`for` konsumuje tablicę, patrz niżej funkcje wbudowane `iter_*`)
+    - `e2` wyrażeniem blokowym zwracającym `()`  
+    For zwraca `()`
+  - blok - `{ s1 s2 ... sn }` - gdzie `si` to statement.
+    Jeśli ostatni statement to statement wyrażeniowy zawierający wyrażenie zwracające typ `T`, to blok zwraca typ `T`. W przeciwnym wypadku zwraca `()`.
+  - funkcje anonimowe - `|c1, c2, ...|(a1: T1, ...) -> R e` - gdzie
+    - `ci` są postaci `x`, `&x`, bądź `&mut x`, a `x` jest nazwą zmiennej widocznej w aktualnym bloku. Capture `x` przenosi właśność zmiennej do funkcji anonimowej, `&x` tworzy referencję na `x`, a `&mut x` tworzy mutowalną referencje na `x`.
+    - `ai` to nazwa parametru o typie `Ti`. Parametry są traktowane jak stałe.
+    - `-> R` to deklaracja typu zwracanego przez funkcję, jeśli brak, funkcja zwraca `R = ()`.
+    - `e` to wyrażenie blokowe zwracające typ `R`.  
+    Jeśli dowolna operacja wewnątrz `e` może konsumować wartość dowolnego capture, wyrażenie zwraca typ `FnOnce(T1, T2...) -> R`. W przeciwnym przypadku zwraca typ `Fn(T1, T2...) -> R`
+- Ownership-based memory model
+  > * * *
+  > Poniższe zasady obowiązują wewnątrz type checkera. Wykonywanie przekompilowanego ast zakłada poniższe zasady są spełnione, ale może radośnie je ingorować.
+  > * * *
+  Wzorowane na
+    - https://doc.rust-lang.org/stable/book/ch04-01-what-is-ownership.htm
+    - https://doc.rust-lang.org/stable/book/ch04-02-references-and-borrowing.html
+
+  Zasady ownership wartości:
+  - Każda wartość ma swojego właściciela - zmienną, bądź aktualne wyrażenie (zmienne tymczasowe)
+  - Każda zmienna ma dokładnie jednego właściciela
+  - Jeśli właściciel jest usuwany, wartość jest usuwana 
+  
+  Zasady pożyczania
+  - W każdym możliwym momencie może istnieć maksymalnie jedna mutowalna referencja (`&mut`), albo dowolnie wiele niemutowalnych referencji (`&`) na daną zmienną.
+  - Wszystkie referencje muszą być poprawne.
+- Funkcje wbudowane:
+  - `print_*` - wypisuje na konsoli
+    - `print_i32(i32)`
+    - `print_char(char)`
+    - `print_bool(bool)`
+    - `print_string(string)`
+  - `input_*` - wczytuje input z konsoli
+    - `input_i32() -> i32` - może zwrócić błąd parsowania
+    - `input_char() -> char` - nie można wczytać białego znaku
+    - `input_bool() -> bool` - może zwrócić błąd parsowania
+    - `input_string() -> string` - wczytuje jedno słowo
+  - `length_*` - zwraca wielkość tablicy
+    - `length_i32(&[i32]) -> i32`
+    - `length_char(&[char]) -> i32`
+    - `length_bool(&[bool]) -> i32`
+    - `length_string(&string) -> i32`
+    - `length_array_i32(&[[i32]]) -> i32`
+  - `iter_*` - przydatne szczególnie wewnątrz fora, aby nie konsumować tablicy, po której się iteruje
+    - `iter_i32(&[i32]) -> [&i32]`
+    - `iter_char(&[char]) -> [&char]`
+    - `iter_bool(&[bool]) -> [&bool]`
+    - `iter_string(&string) -> [&string]`
+    - `iter_array_i32(&[[i32]]) -> [&[i32]]`
+## Nie zaimplementowane
+- struktur
+- wariantów
+- match
+- explicit lifetime annotations
+
+# Obliczanie wyrażeń:
+Wzorowane na: https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
+
+Każde wyrażenie ma swój rodzaj: Value expression lub Place expression.  Wyrażenia są obliczane w Value context, bądź Place context.  
+Place context i Place expression mogą być mutowalne, bądź niemutowalne.  
+Obliczanie wyrażenia pod Place context, zwraca Place, a pod Value context zwraca Value. Jeśli Place context wymaga mutowalności, zwracane jest Mutowalne Place.
+
+Place expression reprezentują miejsce w pamięci, jeśli Place jet mutowalne, to do danego miejsca w pamięci można przypisać wartość. Wartości Place zachowują się jak referencje/mutowalne referencje.  
+Value expression przechowują wartość.
+
+Następujące miejsca są Place context:
+- lewe wyrażenie wywołania funkcji
+- lewe wyrażenie indeksu tablicy
+- argument dereferencji - Mutowalne place
+- argument referencji
+- argument mutowalnej referencji - Mutowalne place
+- arguemnty porównań
+- lewe wyrażenie przypisania i przypisania z operacją - Mutowalne place
+
+Wszystkie pozostałe miejsca są Value context
+
+Następujące wyrażenia są rodzaju Place:
+- wyrażenie zmiennej
+- indeks tablicy
+- dereferencja
+
+Wszystkie pozostałe miejsca są rodzaju Expression
+
+Obliczanie Value Expression w Place Context tworzy zmienną tymczasową, która zostanie usunięta wraz z końcem aktualnego statement.  
+Obliczanie Place Expression w Value Context:
+- Jeśli Place jest `Copy` - tworzy nową wartość kopiując wartość pod Place
+- W przeciwnym przypadku - konsumuje Place, przenosząc ownership wartości na wyrażenie
+- Wyjątki:
+  - Jeśli oczekujemy wartości typu `&T`, a mamy `&T` lub `&mut T` następuje tzw. implicit reborrow: Place jest konsumowane, ale w wartości dodawane jest oznaczenie, że dane Place ma zostać oddtworzone z tą wartością w momencie, gdy zwrócone Value miałoby być usuwane.  
+    Jest to przydatne szczególnie dla zmiennych typu `&mut T`. Pozwala to wywoływać na przykład na:
+    ```rust
+    var x = 5;
+    var y = &mut x;
+    f(y); // bez implicit reborrow, y byłby usunięty
+    f(y);
+    
+    ```
+  - Jeśli oczekujemy wartości typu `T`, a mamy `&T` lub `&mut T` a `T` jest `Copy`, następuje dereferencja Place i zwrócona kopia wartości przechowywanej pod Place.
+    Ułatwia to korzystanie z referencji i również pozwala na wielokrotne wykorzystywanie ich. Na przykład:
+    ```rust
+    var x = 5;
+    var y = &mut x;
+    print_i32(y); // Implicit dereference, y dalej istnieje
+    print_i32(*y); // Inaczej trzebaby było napisać tak, to konsumuje zmienną y. (Dalej jest to legalny zapis)
+    // print_i32(y); --- błąd, y został usunięty linijkę wyżej
+    ``` 
+
+Typy prymitywne i funkcyjne (`Fn`, ale nie `FnOnce`) są `Copy`

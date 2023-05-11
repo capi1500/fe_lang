@@ -95,6 +95,8 @@ addToScope (A.ItemVariable p cv (A.Ident ident) typeDeclaration initialization) 
 instance TypeCheck A.Statement Statement where
     typeCheck :: A.Statement -> PreprocessorMonad Statement
     typeCheck (A.SemicolonStatement p) = do
+        scope <- gets typeDefinitions
+        when (isGlobal scope) $ do throw (InvalidStatementAtGlobalScope p)
         endStatement
         return EmptyStatement
     typeCheck (A.ItemStatement p item) = do
@@ -107,6 +109,8 @@ instance TypeCheck A.Statement Statement where
         return statement
     typeCheck (A.ExpressionStatement p expression) = do
         putPosition p
+        scope <- gets typeDefinitions
+        when (isGlobal scope) $ do throw (InvalidStatementAtGlobalScope p)
         (expression', value) <- typeCheckInValueContext Nothing expression
         -- printVariables
         dropValue value
@@ -162,6 +166,7 @@ instance TypeCheck A.Item Statement where
             addVariable name mutability (setValueOwned ByVariable value)
             return $ VarInitialized expression'
         else do
+            when (declaredType == TUntyped) $ throw (CannotInferType p)
             id <- addVariable name mutability (Value declaredType [] [] [] ByVariable)
             mutateVariableById id (setVariableState Uninitialized)
             return VarUninitialized
@@ -217,9 +222,9 @@ instance TypeCheck A.Expression TypedExpression where
             (condition', conditionValue) <- typeCheckInValueContext (Just boolType) condition
             return condition'
         setInsideLoopExpression True
-        (block', _) <- typeCheckInValueContext Nothing block
+        (block', _) <- typeCheckInValueContext (Just unitType) block
         -- TODO: should disable warnings, but not errors
-        _ <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
+        _ <- typeCheckInValueContext (Just unitType) block -- check if block can be executed multiple times (so no move happens inside etc.)
         setInsideLoopExpression False
         et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
@@ -233,9 +238,9 @@ instance TypeCheck A.Expression TypedExpression where
         block' <- inNewScope $ do
             id <- makeValue (hasPosition e) innerT ByVariable >>= addVariable ident Const
             setInsideLoopExpression True
-            (block', _) <- typeCheckInValueContext Nothing block
+            (block', _) <- typeCheckInValueContext (Just unitType) block
             -- TODO: should disable warnings, but not errors
-            _ <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
+            _ <- typeCheckInValueContext (Just unitType) block -- check if block can be executed multiple times (so no move happens inside etc.)
             setInsideLoopExpression False
             moveOutById id
             return block'
@@ -337,9 +342,7 @@ instance TypeCheck A.Expression TypedExpression where
         let TFunction kind _ declaredParams returnType = functionType
         when (length params /= length declaredParams) $ throw (WrongNumberOfParams p functionType)
         let paramCheck = \(paramDeclaredType, A.CallParam _ param) -> do
-            -- printDebug ("Param type: " ++ codePrint 1 paramDeclaredType)
             (paramExpression, paramValue) <- typeCheckInValueContext (Just paramDeclaredType) param
-            -- printDebug ("Passing value: " ++ codePrint 1 paramValue)
             dropValue paramValue -- TODO: for now, drop, transfer to return value when allowing for explicit lifetimes
             return paramExpression
 
@@ -418,7 +421,6 @@ instance TypeCheck A.Expression TypedExpression where
             dropValue id
             return $ TypedExpression (mod $ DereferenceExpression (DereferenceExpression e')) et
         else do
-            -- borrowedVariable is borrowing mutably
             return $ TypedExpression (DereferenceExpression e') (PlaceType mutability derefedPlaceId)
     typeCheck (A.UnaryExpression _ (A.Reference p) e) = do
         (e', borrowedId) <- typeCheckInPlaceContext Const e
@@ -512,7 +514,7 @@ makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     assertType p (valueType v1) (valueType v2)
 
     let TReference _ innerT = valueType v1
-    when (isFunction innerT) $ throw (CannotCompareFunctions innerT)
+    when (isFunction innerT) $ throw (CannotCompareFunctions p id1 id2)
 
     expressionType <- makeValue p boolType ByExpression >>= createValueExpression
     dropValue v1
@@ -604,29 +606,39 @@ instance TypeCheck A.IfExpression TypedExpression where
 
 ifExpression :: (TypeCheck a TypedExpression, HasPosition a) => A.BNFC'Position -> A.Expression -> A.Expression -> Maybe a -> PreprocessorMonad TypedExpression
 ifExpression p condition onTrue onFalse = do
-    condition' <- do
-        (condition', v) <- typeCheckInValueContext (Just boolType) condition
-        dropValue v
-        return condition'
+    (condition', Variables mappings variablesBeforeIf) <- inNewScope $ do
+        vars <- gets variables
+        condition' <- do
+            (condition', v) <- typeCheckInValueContext (Just boolType) condition
+            dropValue v
+            endStatement
+            return condition'
+        return (condition', vars)
 
     -- need to preserve state of variables before onTrue and onFalse. Then merge them
-    Variables mappings variablesBeforeIf <- gets variables
-    (onTrue', onTrueValue) <- do
-        (onTrue', onTrueValue) <- typeCheckInValueContext Nothing onTrue
-        return (onTrue', onTrueValue)
-    let onTrueType = valueType onTrueValue
-    Variables _ variablesAfterTrue <- gets variables
+    -- Variables mappings variablesBeforeIf <- gets variables
+    putVariables $ Variables mappings variablesBeforeIf
+    (onTrue', onTrueValue, variablesAfterTrue) <- inNewScope $ do
+        (onTrue', onTrueValue) <- do
+            (onTrue', onTrueValue) <- typeCheckInValueContext Nothing onTrue
+            return (onTrue', onTrueValue)
+        Variables _ vars <- gets variables
+        return (onTrue', onTrueValue, vars)
 
     putVariables $ Variables mappings variablesBeforeIf
-    (onFalse', onFalseValue) <- do
-        if isNothing onFalse then do
-            value <- makeValue p unitType ByExpression
-            return (Nothing, value)
-        else do
-            (onFalse', onFalseValue) <- typeCheckInValueContext Nothing (fromJust onFalse)
-            return (Just onFalse', onFalseValue)
+    (onFalse', onFalseValue, variablesAfterFalse) <- inNewScope $ do
+        (onFalse', onFalseValue) <- do
+            if isNothing onFalse then do
+                value <- makeValue p unitType ByExpression
+                return (Nothing, value)
+            else do
+                (onFalse', onFalseValue) <- typeCheckInValueContext Nothing (fromJust onFalse)
+                return (Just onFalse', onFalseValue)
+        Variables _ variablesAfterFalse <- gets variables
+        return (onFalse', onFalseValue, variablesAfterFalse)
+
+    let onTrueType = valueType onTrueValue
     let onFalseType = valueType onFalseValue
-    Variables _ variablesAfterFalse <- gets variables
 
     putPosition p
     mergedVariables <- mergeVariables variablesAfterTrue variablesAfterFalse
@@ -736,6 +748,7 @@ typeCheckInValueContext t e = withinContext $ do
     putExpressionContext $ ValueContext t
     putPosition (hasPosition e)
     TypedExpression e' et <- typeCheck e
+    putPosition (hasPosition e)
     let ValueType v = et
     forM_ t (assertType (hasPosition e) (valueType v))
     return (e', v)
@@ -745,5 +758,6 @@ typeCheckInPlaceContext mutable e = withinContext $ do
     putExpressionContext $ PlaceContext mutable
     putPosition (hasPosition e)
     TypedExpression e' et <- typeCheck e
+    putPosition (hasPosition e)
     let PlaceType _ v = et
     return (e', v)

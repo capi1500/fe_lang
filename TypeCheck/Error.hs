@@ -14,6 +14,7 @@ import Common.Printer
 debug = True
 
 data PreprocessorError =
+    InvalidStatementAtGlobalScope BNFC'Position |
     TypeAlreadyInScope BNFC'Position Identifier Type Type | -- ident, new definition, old definition
     TypeNotDefined BNFC'Position Identifier |
     TypeMismatch BNFC'Position Type Type | -- ident, ident actual type, ident expected type
@@ -25,7 +26,6 @@ data PreprocessorError =
     VariableAtGlobalScope BNFC'Position Identifier |
     UninitializedVariableUsed BNFC'Position VariableId | -- where, defined
     UseAfterMoved BNFC'Position VariableId |
-    AssignmentToConstant BNFC'Position VariableId |
     AlreadyBorrowed BNFC'Position VariableId |
     CannotBorrowFnOnce BNFC'Position VariableId |
     CannotMoveOut BNFC'Position Variable |
@@ -35,7 +35,7 @@ data PreprocessorError =
     CannotDerefNotReference BNFC'Position Type |
     CannotDerefReferenceToMultipleVariables BNFC'Position |
     WrongNumberOfParams BNFC'Position Type |
-    CannotCompareFunctions Type |
+    CannotCompareFunctions BNFC'Position VariableId VariableId |
     BreakNotInLoop BNFC'Position |
     ContinueNotInLoop BNFC'Position |
     CannotMergeStateAfterIf BNFC'Position VariableId VariableState VariableState |
@@ -44,7 +44,6 @@ data PreprocessorError =
   deriving (Eq, Ord, Show, Read)
 
 data PreprocessorWarning =
-    Shadow Identifier VariableId |
     VariableNotInitializedNotUsed VariableId |
     Debug String
   deriving (Eq, Ord, Show, Read)

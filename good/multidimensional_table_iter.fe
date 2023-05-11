@@ -1,0 +1,27 @@
+fn main() {
+    const table: [i32] = [10;0];
+	var i = 0;
+	while (i < length_i32(&table)) {
+		print_i32(table[i]);
+		print_string(" ");
+		i += 1;
+	}
+	print_string("\n");
+	
+	var multi_table: [[i32]] = [10;[5;0]];
+	var x = 0;
+	var y = 0;
+	for (row in iter_array_i32(&multi_table)) {
+        for (v in iter_i32(row)) {
+			x += 1;
+			print_string("(");
+			print_i32(x);
+			print_string(", ");
+			print_i32(y);
+			print_string(") ");
+		}
+		y += 1;
+		x = 0;
+		print_string("\n");
+	}
+}

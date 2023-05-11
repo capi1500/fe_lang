@@ -1,0 +1,16 @@
+fn main() {
+	const r = 1..10;
+	var i = 0;
+	while (i < length_i32(&r)) {
+		print_i32(r[i]);
+		print_string(" ");
+		i += 1;
+	}
+	print_string("\n");
+	const rev = 10..1;
+	for (x in rev) {
+		print_i32(x);
+		print_string(" ");
+	}
+	print_string("\n");
+}

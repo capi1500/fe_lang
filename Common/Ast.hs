@@ -3,6 +3,7 @@
 module Common.Ast where
 
 import Data.Map (Map)
+import Data.Maybe
 import Data.List (intercalate)
 import Control.Monad.State
 import Control.Monad.Except
@@ -29,15 +30,13 @@ data ExecutionError =
     TypeCheckerFailed String
 
 instance Show ExecutionError where
-    show (DivisionByZero p) = "Division by zero at: " ++ show p
-    show (ShiftInvalidArgument p arg) = "Invalid shift argument: " ++ show arg ++ ", at: " ++ show p
-    show (InputFailed p) = "Input failed at: " ++ show p
-    show (IndexOutOfRange p index size) = "Index: " ++ show index ++ " out of range [0, " ++ show size ++ "] at: " ++ show p
-    show Break = "Break"
-    show Continue = "Continue"
-    show (Return value) = "Return"
+    show (DivisionByZero p) = "Division by zero at: " ++ show (fromJust p)
+    show (ShiftInvalidArgument p arg) = "Invalid shift argument: " ++ show arg ++ ", at: " ++ show (fromJust p)
+    show (InputFailed p) = "Input failed at: " ++ show (fromJust p)
+    show (IndexOutOfRange p index size) = "Index: " ++ show index ++ " out of range [0, " ++ show size ++ "] at: " ++ show (fromJust p)
     show (Other string) = "Other " ++ string
     show (TypeCheckerFailed string) = "FATAL: " ++ string
+    show x = "FATAL: " ++ "internal error" ++ show x
 
 data Variable = Variable Value | Uninitialized
 
@@ -69,7 +68,6 @@ data Expression =
     IfExpression Expression Expression (Maybe Expression) | -- condition onTrue [onFalse]
     WhileExpression Expression Expression | -- condition, block
     ForExpression Identifier Expression Expression |
-    -- ForExpression Pattern Expression Expression |
     -- MatchExpression Expression [MatchArm]
     InternalExpression (ExecutorMonad Value) |
     LiteralExpression Value |
@@ -85,7 +83,6 @@ data Expression =
     IndexExpression BNFC'Position Expression Expression |
     UnaryMinusExpression Expression |
     UnaryNegationExpression Expression |
-    -- TypeCastExpression Expression (Type) |
     I32DoubleOperatorExpression BNFC'Position NumericDoubleOperator Expression Expression |
     BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression |
     RangeExpression Expression Expression |

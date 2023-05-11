@@ -1,0 +1,5 @@
+fn main () {
+	var x = 5;
+	var y: &mut i32 = &mut x;
+	var z = &mut *y;
+}

@@ -1,0 +1,6 @@
+fn main() {
+	const a: i32 = 5;
+	const b: i32 = 5;
+	const c: char = 'a';
+	const d: String = "Hello there";
+}

@@ -45,6 +45,18 @@ getLocalVariable ident = do
         id <- lookup ident mappings
         return (id, listGet id variables)
 
+isGlobalVariable :: Identifier -> PreprocessorMonad Bool
+isGlobalVariable ident = do
+    Variables scope variables <- gets variables
+    return $ helper ident scope variables
+  where
+    helper :: Identifier -> VariableMappings -> [Variable] -> Bool
+    helper ident (Global mappings) variables =
+        isJust (lookup ident mappings)
+    helper ident (Local parent mappings) variables =
+        let id = lookup ident mappings in
+        isNothing id && helper ident parent variables
+
 -- does not change lifetimes, takes it from the environment
 addVariable :: Identifier -> Mutable -> Value -> PreprocessorMonad VariableId
 addVariable ident mut value = do
@@ -113,9 +125,6 @@ mutateVariableById id mutate = do
 checkShadowing :: String -> PreprocessorMonad (Maybe VariableId)
 checkShadowing name = do
     maybeVar <- getLocalVariable name
-    unless (isNothing maybeVar || shadowingOk (fromJust maybeVar)) $ do
-        let Just (originalVariableId, _) = maybeVar
-        addWarning (Shadow name originalVariableId)
     return $ do
         (i, _) <- maybeVar
         Just i

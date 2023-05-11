@@ -1,0 +1,19 @@
+fn fib(first: i32, second: i32, cur: i32, max: i32) -> i32 {
+    if (cur < max) {
+		print_i32(first);
+		print_char(' ');
+        fib(second, first + second, cur + 1, max)
+    } else {
+        first
+    }
+}
+
+fn getNthFib(n: i32) {
+    fib(0, 1, 0, n);
+}
+
+fn main() {
+	print_string("Enter a number n: number of first Fibonacci numbers to print\n");
+    getNthFib(input_i32());
+	print_char('\n');
+}

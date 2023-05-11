@@ -33,8 +33,15 @@ internals = [
         makeInternalFunction "input_bool" [] boolType (InternalExpression inputBoolFunction),
         makeInternalFunction "input_string" [] stringType (InternalExpression inputStringFunction),
         makeInternalFunction "length_i32" [("v", TReference Const (TArray i32Type))] i32Type (InternalExpression lengthFunction),
+        makeInternalFunction "length_char" [("v", TReference Const (TArray charType))] i32Type (InternalExpression lengthFunction),
+        makeInternalFunction "length_bool" [("v", TReference Const (TArray boolType))] i32Type (InternalExpression lengthFunction),
         makeInternalFunction "length_string" [("v", TReference Const stringType)] i32Type (InternalExpression lengthFunction),
-        makeInternalFunction "iter_i32" [("v", TReference Const (TArray i32Type))] (TArray (TReference Const i32Type)) (InternalExpression iterFunction)
+        makeInternalFunction "length_array_i32" [("v", TReference Const (TArray (TArray i32Type)))] i32Type (InternalExpression lengthFunction),
+        makeInternalFunction "iter_i32" [("v", TReference Const (TArray i32Type))] (TArray (TReference Const i32Type)) (InternalExpression iterFunction),
+        makeInternalFunction "iter_bool" [("v", TReference Const (TArray boolType))] (TArray (TReference Const boolType)) (InternalExpression iterFunction),
+        makeInternalFunction "iter_char" [("v", TReference Const (TArray charType))] (TArray (TReference Const charType)) (InternalExpression iterFunction),
+        makeInternalFunction "iter_string" [("v", TReference Const stringType)] (TArray (TReference Const charType)) (InternalExpression iterFunction),
+        makeInternalFunction "iter_array_i32" [("v", TReference Const (TArray (TArray i32Type)))] (TArray (TReference Const (TArray i32Type))) (InternalExpression iterFunction)
     ]
 
 printFunction :: ExecutorMonad Value
@@ -48,7 +55,6 @@ printCharFunction = do
     (_, Variable (VChar c)) <- getVariable "v"
     liftIO $ putStr [c]
     return VUnit
-
 
 printStringFunction :: ExecutorMonad Value
 printStringFunction = do

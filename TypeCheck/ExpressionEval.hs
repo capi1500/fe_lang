@@ -17,7 +17,6 @@ import TypeCheck.VariablesUtils
 import TypeCheck.BorrowCheckerUtils
 import TypeCheck.Utils
 import Control.Monad.Except
-import TypeCheck.Printer (printDebug)
 import Common.Ast (Expression (DereferenceExpression))
 import Common.Printer
 
@@ -58,7 +57,6 @@ internalCreatePlaceExpression variableId (ValueContext expectedType) = do
             do {
                 derefedId <- deref (variableValue variable);
                 derefedVariable <- getVariableById derefedId;
-                printDebug $ "implicit deref " ++ codePrint 1 derefedVariable;
                 return (DereferenceExpression, ValueType (variableValue derefedVariable))
             } `catchError` handler variable
         else if isReference t && canSubstitute (variableType variable) t then do
@@ -66,8 +64,7 @@ internalCreatePlaceExpression variableId (ValueContext expectedType) = do
             unless (isCopy (variableType variable)) $ mutateVariableById variableId (setVariableValue value)
             moveOutById variableId -- will be recreated from value later
             return (id, ValueType value)
-        else do
-            def variable
+        else def variable
     else def variable
   where
     def variable = do

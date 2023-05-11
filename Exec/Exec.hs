@@ -76,8 +76,9 @@ instance Executable Initialization Variable where
 instance Executable Expression Value where
     execute :: Expression -> ExecutorMonad Value
     execute (BlockExpression statements) = do
-        values <- traverse (\x -> do execute x >>= varValue) statements
-        deref (valueOfBlock values)
+        inNewScope $ do
+            values <- traverse (\x -> do execute x >>= varValue) statements
+            deref (valueOfBlock values)
     execute (IfExpression condition onTrue maybeOnFalse) = do
         VBool bool <- execute condition >>= varValue
         if bool then do
@@ -131,7 +132,8 @@ instance Executable Expression Value where
         pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
         return $ VArray pointers
     execute (MakeArrayDefaultsExpression e1 e2) = do
-        VI32 size <- execute e1
+        VI32 size <- execute e1 >>= varValue
+        -- print $ show size
         pointers <- traverse (\id -> do
             value <- execute e2 >>= varValue
             addTmpVariable (Variable value)
@@ -253,9 +255,9 @@ equals (VChar a) (VChar b) = do return $  a == b
 equals (VBool a) (VBool b) = do return $  a == b
 equals VUnit VUnit = do return True
 equals (VStruct a) (VStruct b) = do
-    throwError $ Other "Not yet implemented: cmp of structs"
+    throwError $ Other "Not yet implemented: compare of structs"
 equals (VVariant tag1 a) (VVariant tag2 b) = do
-    throwError $ Other "Not yet implemented: cmp of variants"
+    throwError $ Other "Not yet implemented: compare of variants"
 equals VFunction {} VFunction {} = do
     throwError $ TypeCheckerFailed "Cannot compare function values directly"
 equals (VArray a) (VArray b) = do
@@ -267,12 +269,7 @@ equals (VArray a) (VArray b) = do
         out <- traverse (uncurry equals) (zip values1 values2)
         return $ and out
 equals (VReference a) (VReference b) = do
-    if a == b then do
-        return True
-    else do
-        Variable a' <- getVariableById a
-        Variable b' <- getVariableById b
-        equals a' b'
+    return $ a == b
 equals _ _ = do return False
 
 doNumericDoubleOperator :: BNFC'Position -> NumericDoubleOperator -> Value -> Value -> ExecutorMonad Value

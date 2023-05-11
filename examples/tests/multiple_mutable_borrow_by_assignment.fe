@@ -1,5 +1,0 @@
-fn main () {
-	var x = 5;
-	var y = &mut x;
-	var z = *y;
-}

@@ -1,0 +1,5 @@
+const x = "Hello";
+
+fn main() {
+	print_string(x);
+}

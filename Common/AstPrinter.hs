@@ -46,7 +46,8 @@ instance CodePrint Expression where
 instance CodePrint Value where
     codePrint _ (VI32 i) = show i
     codePrint _ (VChar c) = show c
-    codePrint _ (VBool b) = show b
+    codePrint _ (VBool True) = "true"
+    codePrint _ (VBool False) = "false"
     codePrint _ VUnit = "()"
     codePrint _ (VReference ptr) = "ptr(" ++ show ptr ++ ")"
     codePrint tabs (VVariable ptr (Variable var)) = "(ptr(" ++ show ptr ++ "), " ++ codePrint tabs var ++ ")"
