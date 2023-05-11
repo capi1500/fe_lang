@@ -36,6 +36,7 @@ instance CodePrint Expression where
         "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
     codePrint tabs (MakeArrayDefaultsExpression e1 e2) = "[" ++ codePrint tabs e1 ++ "; " ++ codePrint tabs e2 ++ "]"
     codePrint tabs (AssignmentExpression e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
+    codePrint tabs (RangeExpression e1 e2) = codePrint tabs e1 ++ ".." ++ codePrint tabs e2
     codePrint tabs BreakExpression = "break"
     codePrint tabs ContinueExpression = "continue"
     codePrint tabs (ReturnExpression e) = "return " ++ codePrint tabs e

@@ -87,7 +87,7 @@ data Expression =
     -- TypeCastExpression Expression (Type) |
     I32DoubleOperatorExpression BNFC'Position NumericDoubleOperator Expression Expression |
     BoolDoubleOperatorExpression BooleanDoubleOperator Expression Expression |
-    -- RangeExpression Expression Expression |
+    RangeExpression Expression Expression |
     AssignmentExpression Expression Expression | -- expression1, expression2
     BreakExpression |
     ContinueExpression |

@@ -444,6 +444,11 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.AssignmentExpression p e1 operator e2) = do
         putPosition p
         makeAssignmentExpression operator e1 e2
+    typeCheck (A.RangeExpression p e1 e2) = do
+        (e1', _) <- typeCheckInValueContext (Just i32Type) e1
+        (e2', _) <- typeCheckInValueContext (Just i32Type) e2
+        et <- makeValue p (TArray i32Type) ByExpression >>= createValueExpression
+        return $ TypedExpression (RangeExpression e1' e2') et
     typeCheck (A.BreakExpression p) = do
         context <- gets context
         unless (insideLoopExpression context) $ throw (BreakNotInLoop p)

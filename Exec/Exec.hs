@@ -175,6 +175,16 @@ instance Executable Expression Value where
     execute (UnaryNegationExpression e) = do
         VBool v <- execute e >>= varValue
         return $ VBool (not v)
+    execute (RangeExpression e1 e2) = do
+        VI32 v1 <- execute e1 >>= varValue
+        VI32 v2 <- execute e2 >>= varValue
+        let values = if v1 < v2 then
+                [VI32 i | i <- [v1..v2]]
+            else
+                reverse ([VI32 i | i <- [v2..v1]])
+
+        pointers <- traverse (\v -> do addTmpVariable (Variable v)) values
+        return $ VArray pointers
     execute (ReturnExpression e) = do
         v <- execute e >>= varValue
         throwError $ Return v
