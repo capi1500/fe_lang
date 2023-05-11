@@ -2,5 +2,4 @@ Fe
 *.e
 *.hi
 *.o
-Makefile
 *.bak
