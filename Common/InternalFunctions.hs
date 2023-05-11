@@ -33,7 +33,8 @@ internals = [
         makeInternalFunction "input_bool" [] boolType (InternalExpression inputBoolFunction),
         makeInternalFunction "input_string" [] stringType (InternalExpression inputStringFunction),
         makeInternalFunction "length_i32" [("v", TReference Const (TArray i32Type))] i32Type (InternalExpression lengthFunction),
-        makeInternalFunction "length_string" [("v", TReference Const stringType)] i32Type (InternalExpression lengthFunction)
+        makeInternalFunction "length_string" [("v", TReference Const stringType)] i32Type (InternalExpression lengthFunction),
+        makeInternalFunction "iter_i32" [("v", TReference Const (TArray i32Type))] (TArray (TReference Const i32Type)) (InternalExpression iterFunction)
     ]
 
 printFunction :: ExecutorMonad Value
@@ -107,3 +108,10 @@ lengthFunction = do
     (_, Variable (VReference ptr)) <- getVariable "v"
     Variable (VArray lst) <- getVariableById ptr
     return $ VI32 (length lst)
+
+iterFunction :: ExecutorMonad Value
+iterFunction = do
+    (_, Variable (VReference ptr)) <- getVariable "v"
+    Variable (VArray lst) <- getVariableById ptr
+    pointers <- traverse (\ptr -> do addTmpVariable (Variable (VReference ptr))) lst
+    return $ VArray pointers

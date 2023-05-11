@@ -1,0 +1,13 @@
+fn main() {
+	const arr = 1..10;
+	for (x in iter_i32(&arr)) {
+		print_i32(x);
+		print_string(" ");
+	}
+	print_string("\n");
+	for (x in arr) {
+		print_i32(x);
+		print_string(" ");
+	}
+	print_string("\n");
+}

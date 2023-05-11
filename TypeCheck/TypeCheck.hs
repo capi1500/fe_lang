@@ -217,9 +217,9 @@ instance TypeCheck A.Expression TypedExpression where
             (condition', conditionValue) <- typeCheckInValueContext (Just boolType) condition
             return condition'
         setInsideLoopExpression True
-        (block', blockValue) <- typeCheckInValueContext Nothing block
+        (block', _) <- typeCheckInValueContext Nothing block
         -- TODO: should disable warnings, but not errors
-        (block', blockValue) <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
+        _ <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
         setInsideLoopExpression False
         et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
@@ -230,13 +230,15 @@ instance TypeCheck A.Expression TypedExpression where
         unless (isArray t) $ throw (TypeNotIndexable p t)
         let TArray innerT = t
 
-        id <- makeValue (hasPosition e) innerT ByVariable >>= addVariable ident Const
-        setInsideLoopExpression True
-        (block', blockValue) <- typeCheckInValueContext Nothing block
-        -- TODO: should disable warnings, but not errors
-        (block', blockValue) <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
-        setInsideLoopExpression False
-        moveOutById id
+        block' <- inNewScope $ do
+            id <- makeValue (hasPosition e) innerT ByVariable >>= addVariable ident Const
+            setInsideLoopExpression True
+            (block', _) <- typeCheckInValueContext Nothing block
+            -- TODO: should disable warnings, but not errors
+            _ <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
+            setInsideLoopExpression False
+            moveOutById id
+            return block'
 
         et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (ForExpression ident e' block') et
