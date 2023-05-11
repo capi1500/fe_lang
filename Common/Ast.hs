@@ -12,7 +12,7 @@ import Common.Utils
 import Common.Printer
 import Common.Scope
 
-import Fe.Abs (BNFC'Position)
+import Fe.Abs (BNFC'Position, Expression' (ForExpression))
 
 mainFunction :: Identifier
 mainFunction =  "main"
@@ -68,6 +68,7 @@ data Expression =
     BlockExpression [Statement] |
     IfExpression Expression Expression (Maybe Expression) | -- condition onTrue [onFalse]
     WhileExpression Expression Expression | -- condition, block
+    ForExpression Identifier Expression Expression |
     -- ForExpression Pattern Expression Expression |
     -- MatchExpression Expression [MatchArm]
     InternalExpression (ExecutorMonad Value) |

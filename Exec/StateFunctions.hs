@@ -56,15 +56,6 @@ setVariableById id value = do
   variables <- gets variables
   putVariables (listSet id (Variable value) variables)
 
-removeVariable :: Identifier -> ExecutorMonad ()
-removeVariable ident = do
-    ExecutionState mappings variables input p <- get
-    let id = length variables
-    put $ ExecutionState (helper mappings id) variables input p
-  where
-    helper (Global map) id = Global $ insert ident id map
-    helper (Local parent map) id = Local parent (insert ident id map)
-
 inNewScope :: ExecutorMonad a -> ExecutorMonad a
 inNewScope f = do
     state <- get

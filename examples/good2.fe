@@ -1,15 +1,15 @@
 fn nice_print(printer: Fn() -> i32) {
-    print_string("Very nice printing\n");
+    print_string("Very nice printing ");
     print_i32(printer());
     print_string("\n");
 }
 
 fn main() {
-    var i = 1;
-	while (i < 10) {
+    for (i in 0..10) {
+		print_i32(i);
+		print_string(": ");
         nice_print(|&i|(a: i32) -> i32 { // borrow x
             ((i + 6 * 4 - 3) % 6)
         }); // Should print (x + (6 * 4) - 3) % 6
-		i += 1;
     }
 }

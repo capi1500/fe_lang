@@ -223,6 +223,23 @@ instance TypeCheck A.Expression TypedExpression where
         setInsideLoopExpression False
         et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
+    typeCheck (A.ForExpression p (A.Ident ident) e block) = do
+        (e', v) <- typeCheckInValueContext Nothing e
+
+        let t = valueType v
+        unless (isArray t) $ throw (TypeNotIndexable p t)
+        let TArray innerT = t
+
+        id <- makeValue (hasPosition e) innerT ByVariable >>= addVariable ident Const
+        setInsideLoopExpression True
+        (block', blockValue) <- typeCheckInValueContext Nothing block
+        -- TODO: should disable warnings, but not errors
+        (block', blockValue) <- typeCheckInValueContext Nothing block -- check if block can be executed multiple times (so no move happens inside etc.)
+        setInsideLoopExpression False
+        moveOutById id
+
+        et <- makeValue p unitType ByExpression >>= createValueExpression
+        return $ TypedExpression (ForExpression ident e' block') et
     typeCheck (A.VariableExpression p (A.Ident name)) = do
         putPosition p
         context <- gets expressionContext

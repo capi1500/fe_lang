@@ -91,7 +91,8 @@ instance Executable Expression Value where
         if bool then do
             x <- do {
                 execute block :: ExecutorMonad Value;
-                return True } `catchError` handler
+                return True
+            } `catchError` handler
             if x then do
                 execute (WhileExpression condition block)
             else do
@@ -99,6 +100,28 @@ instance Executable Expression Value where
         else do
             return VUnit
         where
+            handler :: ExecutionError -> ExecutorMonad Bool
+            handler Break = return False
+            handler Continue = return True
+            handler x = throwError x
+    execute (ForExpression ident e block) = do
+        VArray array <- execute e >>= varValue
+        id <- addVariable ident Uninitialized
+        doLoop id array
+        where
+            doLoop :: Pointer -> [Pointer] -> ExecutorMonad Value
+            doLoop id (head:tail) = do
+                Variable value <- getVariableById head
+                setVariableById id value
+                x <- do {
+                    execute block :: ExecutorMonad Value;
+                    return True
+                } `catchError` handler
+                if x then do
+                    doLoop id tail
+                else do
+                    return VUnit
+            doLoop _ [] = return VUnit
             handler :: ExecutionError -> ExecutorMonad Bool
             handler Break = return False
             handler Continue = return True

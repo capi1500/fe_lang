@@ -60,7 +60,7 @@ If. IfExpression ::= "if" Expression17 Expression18 ;
 IfElse. IfExpression ::= "if" Expression17 Expression18 "else" Expression18 ;
 IfElseIf. IfExpression ::= "if" Expression17 Expression18 "else" IfExpression ;
 WhileExpression. Expression16 ::= "while" Expression17 Expression18 ;
-ForExpression. Expression16 ::= "for" "(" Pattern "in" Expression1 ")" Expression18 ;
+ForExpression. Expression16 ::= "for" "(" Ident "in" Expression1 ")" Expression18 ;
 MatchExpression. Expression16 ::= "match" Expression17 "{" [MatchArm] "}" ;
 MatchArm. MatchArm ::= Pattern "=>" Expression;
 separator MatchArm "," ;
