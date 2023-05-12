@@ -169,6 +169,85 @@ Dodatkowo:
 W pliku `fe.cf` inspirowana gramatyką rusta,która jest dostępna tutaj: https://doc.rust-lang.org/stable/reference/
 ### Konflikty
 Jest 32 konfliktów shift/reduce
+- `{` w stanie:
+	```
+	Expression16 -> Ident .                             (rule 128)
+	Expression16 -> Ident . '{' ListStructExpressionField '}'    (rule 129)
+	```
+	Poprawnie następuje shift próbujący parsować strukturę, inne połączenie `Ident { ...` nie występuje.
+- `)` w stanie 
+	```
+	Expression17 -> '(' Expression1 . ')'               (rule 121)
+	Expression -> Expression1 .                         (rule 202)
+	```
+	Poprawnie następuje dokończenie wyrażenia nawiasowego.
+- `|` w stanie 
+	```
+	Expression6 -> Expression6 . '|' Expression7        (rule 186)
+	Expression5 -> Expression5 ComparisonOperator Expression6 .    (rule 188)
+	```
+	Porównanie wymaga nawiasowania, tak samo jak w rustcie:
+	https://doc.rust-lang.org/stable/reference/expressions.html#expression-precedence
+- `&` w stanie
+	```
+	Expression8 -> Expression8 . '&' Expression9        (rule 182)
+	Expression7 -> Expression7 '^' Expression8 .        (rule 184)
+	```
+	Działa poprawnie, `&` jest silniejszy od `^` co pokazuje wykonanie:
+	```rust
+	fn main() {
+		print_i32(1 ^ 2 & 4); // 1
+		print_i32((1 ^ 2) & 4); // 0
+		print_i32(1 ^ (2 & 4)); // 1
+	}
+	```
+- `-` w stanie
+	```
+	Expression10 -> Expression10 . '+' Expression11     (rule 176)
+	Expression10 -> Expression10 . '-' Expression11     (rule 177)
+	Expression9 -> Expression9 '>>' Expression10 .      (rule 180)
+	```
+	i
+	```
+	Expression10 -> Expression10 . '+' Expression11     (rule 176)
+	Expression10 -> Expression10 . '-' Expression11     (rule 177)
+	Expression9 -> Expression9 '<<' Expression10 .      (rule 180)
+	```
+	Działa poprawnie, `-` jest silniejszy od `>>` i `<<` co pokazuje wykonanie:
+	```rust
+	fn main() {
+		print_i32(1 - 2 >> 4); // -1
+		print_i32((1 - 2) >> 4); // -1
+		print_i32(1 - (2 >> 4)); // 1
+	}
+	```
+- analogicznie jak wyżej `*` w stanach
+	```
+	Expression11 -> Expression11 . '*' Expression12     (rule 172)
+	Expression11 -> Expression11 . '/' Expression12     (rule 173)
+	Expression11 -> Expression11 . '%' Expression12     (rule 174)
+	Expression10 -> Expression10 '+' Expression11 .     (rule 176)
+	```
+	```
+	Expression11 -> Expression11 . '*' Expression12     (rule 172)
+	Expression11 -> Expression11 . '/' Expression12     (rule 173)
+	Expression11 -> Expression11 . '%' Expression12     (rule 174)
+	Expression10 -> Expression10 '-' Expression11 .     (rule 177)
+	```
+	```rust
+	fn main() {
+		print_i32(1 - 2 * 4); // -7
+		print_i32((1 - 2) * 4); // -4
+		print_i32(1 - (2 * 4)); // -7
+	}
+	```
+- błędy (18) w stanie
+	```
+	Expression -> 'return' .                            (rule 200)
+	Expression -> 'return' . Expression1                (rule 201)
+	```
+	poprawnie próbują parsować wyrażnie `return Expression1`. Do oddzielania wyrażeń służy `;`.
+- Pozostałe konflikty (4) występują z koercji.
 ## Obliczanie wyrażeń:
 Wzorowane na: https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
 
