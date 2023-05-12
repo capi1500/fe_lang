@@ -1,7 +1,5 @@
 # Opis języka
-
 ## Tabelka cech
-# Tabelka cech
 Na 15 punktów
 - 01 + (trzy typy)
 - 02 + (literały, arytmetyka, porównania)
@@ -167,8 +165,11 @@ Dodatkowo:
 - wariantów
 - match
 - explicit lifetime annotations
-
-# Obliczanie wyrażeń:
+## Gramatyka
+W pliku `fe.cf` inspirowana gramatyką rusta,która jest dostępna tutaj: https://doc.rust-lang.org/stable/reference/
+### Konflikty
+Jest 32 konfliktów shift/reduce
+## Obliczanie wyrażeń:
 Wzorowane na: https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
 
 Każde wyrażenie ma swój rodzaj: Value expression lub Place expression.  Wyrażenia są obliczane w Value context, bądź Place context.  

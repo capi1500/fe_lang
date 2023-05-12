@@ -1,0 +1,4 @@
+fn main() {
+	var x = 5; // x is i32
+	var y = &x; // y is &i32
+}
