@@ -21,7 +21,7 @@ fn insert_row(row: &mut [i32]) {
 }
 
 fn main() {
-	print_string("input number of columns n and rows m, then (n x m) numbers\n");
+	print_string("input number of rows n and columns m, then (n x m) numbers\n");
 	const n = input_i32();
 	const m = input_i32();
 	var tab = [n;[m;0]];
