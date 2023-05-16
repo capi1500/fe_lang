@@ -1,0 +1,28 @@
+// fn sort(arr: &mut [i32]) {
+	
+// }
+
+// fn print(arr: &[i32]) {
+// 	print_char('[');
+// 	const n = length_i32(arr);
+// 	var i = 0;
+// 	while (i < n) {
+// 		print_i32(arr[i]);
+// 		i += 1;
+// 		if (i != n) {
+// 			print_string(", ");
+// 		}
+// 	}
+// 	print_string("]\n");
+// }
+
+fn input_arr(n: i32) -> [i32] {
+	// [n; input_i32()]
+	// var arr = [n; input_i32()];
+	[0]
+}
+
+fn main() {
+// 	var arr = [4];
+// 	print(&arr);
+}

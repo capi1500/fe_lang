@@ -1,3 +1,7 @@
+fn foo() {
+	print_i32(5);
+}
+
 fn main() {
 	fn foo() {
 		print_i32(1);

@@ -18,9 +18,9 @@ data Type =
 -- can type1 be used as type2
 canSubstitute :: Type -> Type -> Bool
 canSubstitute (TFunction Fn _ params1 return1) (TFunction _ _ params2 return2) =
-    all (uncurry canSubstitute) (zip params1 params2) && canSubstitute return1 return2 -- TODO
+    params1 == params2 && return1 == return2
 canSubstitute (TFunction FnOnce _ params1 return1) (TFunction FnOnce _ params2 return2) =
-    all (uncurry canSubstitute) (zip params1 params2) && canSubstitute return1 return2
+    params1 == params2 && return1 == return2
 canSubstitute (TReference Mutable t1) (TReference _ t2) = canSubstitute t1 t2
 canSubstitute (TReference Const t1) (TReference Const t2) = canSubstitute t1 t2
 canSubstitute t1 t2 = t1 == t2
@@ -151,3 +151,8 @@ instance CodePrint Type where
 instance CodePrint FunctionName where
     codePrint tabs (NamedFunction ident) = " " ++ ident
     codePrint tabs Unnamed = ""
+
+instance CodePrint Capture where
+    codePrint tabs (Capture ident (CMRef Mutable)) = "&mut " ++ ident
+    codePrint tabs (Capture ident (CMRef Const)) = "&" ++ ident
+    codePrint tabs (Capture ident CMNone) = ident

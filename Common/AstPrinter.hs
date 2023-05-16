@@ -3,6 +3,7 @@ import Common.Printer
 import Common.Ast
 import Data.List (intercalate)
 import Data.Maybe
+import Common.Types
 
 instance CodePrint Code where
     codePrint tabs (Code statements) = intercalate "" (fmap (codePrint tabs) statements)
@@ -36,6 +37,7 @@ instance CodePrint Expression where
     codePrint tabs (MakeArrayExpression values) =
         "[" ++ intercalate ", " (fmap (codePrint tabs) values) ++ "]"
     codePrint tabs (MakeArrayDefaultsExpression e1 e2) = "[" ++ codePrint tabs e1 ++ "; " ++ codePrint tabs e2 ++ "]"
+    codePrint tabs (MakeClosureExpression captures params code) = "|" ++ intercalate ", " (fmap (codePrint tabs) captures) ++ "|(" ++ intercalate ", " params ++ ")" ++ codePrint (tabs + 1) code
     codePrint tabs (AssignmentExpression e1 e2) = codePrint tabs e1 ++ " = " ++ codePrint tabs e2
     codePrint tabs (RangeExpression e1 e2) = codePrint tabs e1 ++ ".." ++ codePrint tabs e2
     codePrint tabs BreakExpression = "break"

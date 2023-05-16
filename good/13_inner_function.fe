@@ -1,9 +1,13 @@
 fn main() {
-	fn foo() {
-		print_i32(1);
+	fn foo(a: i32) -> i32{
+		if (a <= 1) {
+			a
+		} else {
+			foo(a - 1) + foo(a - 2)
+		}
 	}
 	
 	var x = 4;
 	
-	foo();
+	print_i32(foo(x));
 }

@@ -17,7 +17,7 @@ lang :
 	-${GHC} ${GHC_OPTS} Fe/Abs.hs
 	-${GHC} ${GHC_OPTS} Fe/Lex.hs
 
-fe : lang
+fe :
 	-${GHC} ${GHC_OPTS} -o interpreter fe.hs
 
 clean :

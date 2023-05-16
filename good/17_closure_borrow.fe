@@ -5,11 +5,13 @@ fn nice_print(printer: Fn() -> i32) {
 }
 
 fn main() {
+	var x = 5;
     for (i in 0..10) {
 		print_i32(i);
 		print_string(": ");
-        nice_print(|&i|(a: i32) -> i32 { // borrow x
+		var f = |&i|() -> i32 { // borrow x
             ((i + 6 * 4 - 3) % 6)
-        });
+        };
+        nice_print(f);
     }
 }

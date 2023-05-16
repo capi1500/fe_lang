@@ -11,6 +11,7 @@ fn main() {
     };
     var g = | |(x: &Fn(i32), y: i32) {
         x(y);
+		x(y);
     };
 
     g(&f, 1);

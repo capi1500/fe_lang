@@ -29,6 +29,11 @@ assertType p actualType expectedType = do
     unless (canSubstitute actualType expectedType) $
         throw $ TypeMismatch p actualType expectedType
 
+strictAssertType :: BNFC'Position -> Type -> Type -> PreprocessorMonad ()
+strictAssertType p actualType expectedType = do
+    unless (actualType == expectedType) $
+        throw $ TypeMismatch p actualType expectedType
+
 isVariableCV :: A.CV -> Bool
 isVariableCV (A.Const _) = False
 isVariableCV (A.Var _) = True

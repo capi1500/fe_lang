@@ -133,6 +133,7 @@ instance TypeCheck A.Item Statement where
 
         putPosition p
         (expression', actualType, paramIds) <- inNewFrame $ do
+                addVariable name Const (setValueOwned ByExpression value)
                 setCurrentFunction functionType
                 paramIds <- traverse addFunctionParam (zip declaredParams params)
                 (expression', value) <- typeCheckInValueContext Nothing expression
@@ -140,7 +141,7 @@ instance TypeCheck A.Item Statement where
                 dropValue value
                 return (expression', valueType value, paramIds)
 
-        assertType p declaredType actualType
+        assertType p actualType declaredType
         return $ NewFunctionStatement name expression' paramIds
 
     typeCheck (A.ItemStruct p ident lifetimes fields) = do
@@ -161,7 +162,7 @@ instance TypeCheck A.Item Statement where
 
             let initializedType = valueType value
 
-            when (declaredType /= TUntyped) $ assertType p declaredType initializedType
+            when (declaredType /= TUntyped) $ assertType p initializedType declaredType
 
             addVariable name mutability (setValueOwned ByVariable value)
             return $ VarInitialized expression'
@@ -483,7 +484,7 @@ instance TypeCheck A.Expression TypedExpression where
     typeCheck (A.ReturnExpressionUnit p) = do
         context <- gets context
         let TFunction _ _ _ currentFunctionReturnType = currentFunction context
-        assertType p unitType currentFunctionReturnType
+        strictAssertType p unitType currentFunctionReturnType
         et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (ReturnExpression (LiteralExpression VUnit)) et
     typeCheck (A.ReturnExpressionValue p e) = do
@@ -511,10 +512,10 @@ makeComparisonOperatorExpression (A.Equals p) e1 e2 = do
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
 
-    assertType p (valueType v1) (valueType v2)
-
     let TReference _ innerT = valueType v1
     when (isFunction innerT) $ throw (CannotCompareFunctions p id1 id2)
+
+    strictAssertType p (valueType v1) (valueType v2)
 
     expressionType <- makeValue p boolType ByExpression >>= createValueExpression
     dropValue v1
@@ -541,7 +542,7 @@ makeI32ComparisonExpression e1 e2 operator = do
     (e2', id2) <- typeCheckInPlaceContext Const e2
     v2 <- makeImplicitBorrowValue id2 Const
 
-    assertType (hasPosition e1) (valueType v1) (TReference Const i32Type) -- here its a reference to int vs int
+    assertType (hasPosition e1) (valueType v1) (TReference Const i32Type) -- v1 is a const reference to i32 (or something that can be substituted to i32 like &i32)
     assertType (hasPosition e2) (valueType v2) (TReference Const i32Type)
     expressionType <- makeValue (hasPosition e1) boolType ByExpression >>= createValueExpression
     dropValue v1
@@ -569,7 +570,7 @@ makeAssignmentExpression (A.Assign p) e1 e2 = do
     (e2', newValue) <- typeCheckInValueContext Nothing e2
     let t2 = valueType newValue
 
-    assertType p t1 t2
+    assertType p t2 t1 -- can t2 be used as t1
 
     when (variableState place == Uninitialized) $ mutateVariableById placeId (setVariableState Free)
     mutateVariableById placeId (setVariableValue (setValueOwned ByVariable newValue))
@@ -647,13 +648,13 @@ ifExpression p condition onTrue onFalse = do
     t <- if isFunction onTrueType && isFunction onFalseType then do
         mergeFunctionTypesOrThrow (hasPosition onTrue) onTrueType onFalseType
     else do
-        assertType (hasPosition onTrue) onTrueType onFalseType
+        strictAssertType (hasPosition onTrue) onTrueType onFalseType
         return onTrueType
 
     let value = Value {
         valueType = t,
         ownedPlaces = ownedPlaces onTrueValue ++ ownedPlaces onFalseValue,
-        borrows = borrows onTrueValue ++ borrows onFalseValue,
+        borrows = borrows onTrueValue ++ borrows onFalseValue, -- TODO: better merge borrows, maybe? when both if and else borrows mutably x (and returns it), it should work I guess, but thats hard
         borrowsMut = borrowsMut onTrueValue ++ borrowsMut onFalseValue,
         owned = ByExpression
     }
@@ -752,7 +753,7 @@ typeCheckInValueContext t e = withinContext $ do
     TypedExpression e' et <- typeCheck e
     putPosition (hasPosition e)
     let ValueType v = et
-    forM_ t (assertType (hasPosition e) (valueType v))
+    forM_ t (\t -> assertType (hasPosition e) t (valueType v))
     return (e', v)
 
 typeCheckInPlaceContext :: (TypeCheck a TypedExpression, HasPosition a) => Mutable -> a -> PreprocessorMonad (Expression, VariableId)
