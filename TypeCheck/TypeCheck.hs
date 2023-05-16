@@ -658,6 +658,8 @@ ifExpression p condition onTrue onFalse = do
         owned = ByExpression
     }
     putPosition p
+    dropValue onTrueValue
+    dropValue onFalseValue
     traverse_ borrow (borrows value)
     traverse_ borrowMut (borrowsMut value)
     et <- createValueExpression value
