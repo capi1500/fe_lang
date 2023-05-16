@@ -112,7 +112,7 @@ instance TypeCheck A.Statement Statement where
         scope <- gets typeDefinitions
         when (isGlobal scope) $ do throw (InvalidStatementAtGlobalScope p)
         (expression', value) <- typeCheckInValueContext Nothing expression
-        -- printVariables
+        unsafePrint $ "Evaluated expression as " ++ codePrint 0 value
         dropValue value
         endStatement
         return (ExpressionStatement expression')
@@ -138,6 +138,7 @@ instance TypeCheck A.Item Statement where
                 paramIds <- traverse addFunctionParam (zip declaredParams params)
                 (expression', value) <- typeCheckInValueContext Nothing expression
                 unless (null (borrows value) && null (borrowsMut value)) $ throw (Other "Checking for dangling references not yet implemented" p)
+                unsafePrint $ show value
                 dropValue value
                 return (expression', valueType value, paramIds)
 
@@ -194,9 +195,6 @@ instance TypeCheck A.Expression TypedExpression where
                             A.ExpressionStatement p expression -> do
                                 putPosition p
                                 (expression', blockValue) <- typeCheckInValueContext Nothing expression
-
-                                -- printVariables
-
                                 endStatement
                                 return (ExpressionStatement expression', blockValue)
                             s -> do
@@ -207,11 +205,15 @@ instance TypeCheck A.Expression TypedExpression where
                     putPosition (hasPosition last)
                     updateLifetime
                     (last', blockValue) <- handler last
+                    getPrintVariables >>= unsafePrint
 
                     return (listPushBack last' prefix', blockValue)
+        unsafePrint $ "block expression: " ++ show blockValue
+        getPrintVariables >>= unsafePrint
 
         -- don't care about lifetimes, dropping values at the end of the block should catch dangling references
         et <- createValueExpression blockValue
+        unsafePrint "1"
         return $ TypedExpression (BlockExpression statements') et
     typeCheck (A.GroupedExpression _ expression) = do
         typeCheck expression
@@ -269,6 +271,8 @@ instance TypeCheck A.Expression TypedExpression where
         traverse_ (\t2 -> do unless (t == t2) $ throw (TypeMismatch p t t2)) (fmap valueType values)
 
         et <- makeValue p (TArray t) ByExpression >>= createValueExpression
+        getPrintVariables >>= unsafePrint
+        unsafePrint $ "Array " ++ show et
         return $ TypedExpression (MakeArrayExpression expressions) et
     typeCheck (A.ArrayExpressionDefault p e1 e2) = do
         (e1', v1') <- typeCheckInValueContext (Just i32Type) e1
@@ -460,6 +464,16 @@ instance TypeCheck A.Expression TypedExpression where
         makeI32DoubleOperatorExpression p e1 e2 BitXor
     typeCheck (A.BitAndExpression p e1 e2) = do
         makeI32DoubleOperatorExpression p e1 e2 BitAnd
+    typeCheck (A.LazyAndExpression p e1 e2) = do
+        (e1', v1) <- typeCheckInValueContext (Just boolType) e1
+        (e2', v2) <- typeCheckInValueContext (Just boolType) e2
+        et <- makeValue p boolType ByExpression >>= createValueExpression
+        return $ TypedExpression (BoolDoubleOperatorExpression LazyAnd e1' e2') et
+    typeCheck (A.LazyOrExpression p e1 e2) = do
+        (e1', v1) <- typeCheckInValueContext (Just boolType) e1
+        (e2', v2) <- typeCheckInValueContext (Just boolType) e2
+        et <- makeValue p boolType ByExpression >>= createValueExpression
+        return $ TypedExpression (BoolDoubleOperatorExpression LazyOr e1' e2') et
     typeCheck (A.ComparisonExpression p e1 operator e2) = do
         putPosition p
         makeComparisonOperatorExpression operator e1 e2
@@ -753,7 +767,7 @@ typeCheckInValueContext t e = withinContext $ do
     TypedExpression e' et <- typeCheck e
     putPosition (hasPosition e)
     let ValueType v = et
-    forM_ t (\t -> assertType (hasPosition e) t (valueType v))
+    forM_ t (assertType (hasPosition e) (valueType v))
     return (e', v)
 
 typeCheckInPlaceContext :: (TypeCheck a TypedExpression, HasPosition a) => Mutable -> a -> PreprocessorMonad (Expression, VariableId)

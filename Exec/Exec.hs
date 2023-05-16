@@ -185,6 +185,18 @@ instance Executable Expression Value where
         v1 <- execute e1 >>= varValue
         v2 <- execute e2 >>= varValue
         doNumericDoubleOperator p operator v1 v2
+    execute (BoolDoubleOperatorExpression LazyAnd e1 e2) = do
+        VBool v1 <- execute e1 >>= varValue
+        if v1 then do
+            execute e2 >>= varValue
+        else do
+            return $ VBool False
+    execute (BoolDoubleOperatorExpression LazyOr e1 e2) = do
+        VBool v1 <- execute e1 >>= varValue
+        if not v1 then do
+            execute e2 >>= varValue
+        else do
+            return $ VBool True
     execute (BoolDoubleOperatorExpression operator e1 e2) = do
         v1 <- execute e1 >>= varValue
         v2 <- execute e2 >>= varValue
@@ -242,10 +254,6 @@ doBooleanDoubleOperator Smaller v1 v2 = do
     VI32 v1' <- deref v1
     VI32 v2' <- deref v2
     return $ VBool (v1' < v2')
-doBooleanDoubleOperator LazyAnd (VBool v1) (VBool v2) = do
-    return $ VBool (v1 && v2)
-doBooleanDoubleOperator LazyOr (VBool v1) (VBool v2) = do
-    return $ VBool (v1 || v2)
 doBooleanDoubleOperator op v1 v2 = do
     throwError $ TypeCheckerFailed (codePrint 0 v1 ++ " " ++ show op ++ " " ++ codePrint 0 v2)
 

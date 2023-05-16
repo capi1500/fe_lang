@@ -1,3 +1,7 @@
+-- return a temporary value from a block which has type with owned places.
+  going out of block drops owned places (as it should), but returned value still has them marked as owned
+
+
 -- przykład na używanie funkcji (sort, sum)
 -- tablica funkcji
 

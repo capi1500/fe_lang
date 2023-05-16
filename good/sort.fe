@@ -1,0 +1,42 @@
+fn sort(arr: &mut [i32]) {
+	const n = length_i32(arr);
+	var i = 1;
+	while (i < n) {
+		var j = i;
+		while (j > 0 && arr[j - 1] > arr[j]) {
+			const tmp = arr[j - 1];
+			arr[j - 1] = arr[j];
+			arr[j] = tmp;
+			j -= 1;
+			print(arr);
+		}
+		i += 1;
+	}
+}
+
+fn print(arr: &[i32]) {
+	print_char('[');
+	const n = length_i32(arr);
+	var i = 0;
+	while (i < n) {
+		print_i32(arr[i]);
+		i += 1;
+		if (i != n) {
+			print_string(", ");
+		}
+	}
+	print_string("]\n");
+}
+
+// fn input_arr() -> [i32] {
+// 	// [n; input_i32()]
+// 	// var arr = [n; input_i32()];
+// 	[0]
+// }
+
+fn main() {
+	var arr = [4, 3, 2, 1];
+	print(&arr);
+	sort(&mut arr);
+	print(&arr);
+}

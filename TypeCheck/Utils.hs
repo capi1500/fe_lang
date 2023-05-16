@@ -3,6 +3,7 @@ module TypeCheck.Utils where
 import Data.Map ( empty, insert, fromList, lookup, Map )
 import Data.Maybe (isNothing, isJust, fromJust)
 import Data.List (intercalate, nub)
+import Data.Set (union, size)
 import Control.Monad.Except
 import Control.Monad.State
 
@@ -22,7 +23,12 @@ import TypeCheck.Variable
 import TypeCheck.VariablesUtils
 import TypeCheck.LifetimeUtils
 import TypeCheck.Printer
-import Data.Set (union, size)
+
+import System.IO.Unsafe (unsafePerformIO)
+
+unsafePrint :: String -> PreprocessorMonad ()
+unsafePrint str = do
+    return $! unsafePerformIO (putStrLn str)
 
 assertType :: BNFC'Position -> Type -> Type -> PreprocessorMonad ()
 assertType p actualType expectedType = do

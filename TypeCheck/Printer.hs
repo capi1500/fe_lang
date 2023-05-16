@@ -18,13 +18,17 @@ printDebug str = do
 
 printVariables :: PreprocessorMonad ()
 printVariables = do
+    getPrintVariables >>= printDebug
+
+getPrintVariables :: PreprocessorMonad String
+getPrintVariables = do
     Variables _ variables <- gets variables
-    printDebug ("Variables: [\n" ++
+    return $ "Variables: [\n" ++
         intercalate ",\n"
             (fmap
                 (\v -> printTabs 1 ++ codePrint 2 v)
                 variables)
-        ++ "]")
+        ++ "]"
 
 instance CodePrint ExpressionType where
     codePrint tabs (PlaceType mut id) = show mut ++ " pointer " ++ show id
