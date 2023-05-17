@@ -34,7 +34,7 @@ isOwnershipByBorrow _ = False
 
 data Value = Value {
     valueType :: Type,
-    ownedPlaces :: [VariableId], -- for arrays, it is only one variableId containing info about all indices
+    ownedPlaces :: [VariableId], -- now only for arrays: first varId contains info about all indices
     borrows :: [(VariableId, BNFC'Position)],
     borrowsMut :: [(VariableId, BNFC'Position)],
     owned :: ValueOwnership
@@ -70,6 +70,10 @@ setVariableId id (Variable createdAt variableIdentifier variableType _ const var
 setValueOwned :: ValueOwnership -> Value -> Value
 setValueOwned owned (Value t ownedPlaces borrows borrowsMut _) =
     Value t ownedPlaces borrows borrowsMut owned
+
+setOwnedPlaces :: [VariableId] -> Value -> Value
+setOwnedPlaces ownedVariables (Value t _ borrows borrowsMut owned) =
+    Value t ownedVariables borrows borrowsMut owned
 
 addBorrowToValue :: (VariableId, BNFC'Position) -> Value -> Value
 addBorrowToValue borrow (Value t ownedVariables borrows borrowsMut owned) =

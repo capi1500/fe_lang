@@ -15,7 +15,8 @@ ItemLifetimeDefinitionsEmpty. ItemLifetimeAnnotation ::= ;
 LifetimeDefinition. LifetimeDefinition ::= "'" Ident ;
 separator LifetimeDefinition "," ;
 
-Parameter. FunctionParam ::= Ident ":" Type ;
+ConstParameter. FunctionParam ::= Ident ":" Type ;
+MutableParameter. FunctionParam ::= "mut" Ident ":" Type ;
 separator FunctionParam "," ;
 ReturnValue. FunctionReturnType ::= "->" Type ;
 ReturnUnit. FunctionReturnType ::= ;

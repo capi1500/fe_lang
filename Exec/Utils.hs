@@ -2,7 +2,7 @@ module Exec.Utils where
 import Common.Ast
 import Common.Types
 import Exec.State
-import Exec.StateFunctions (getVariableById)
+import Exec.StateFunctions
 import Common.Scope
 import Control.Monad.State
 import Data.Map (toList, Map)
@@ -29,6 +29,14 @@ deref x = do
 varValue :: Value -> ExecutorMonad Value
 varValue (VVariable _ (Variable v)) = return v
 varValue x = return x
+
+pack :: Value -> ExecutorMonad Value
+pack (VVariable ptr variable) = do
+    return $ VVariable ptr variable
+pack v = do
+    let variable = Variable v
+    newPointer <- addTmpVariable variable
+    return $ VVariable newPointer variable
 
 instance CodePrint Variable where
     codePrint tabs Uninitialized = "null"

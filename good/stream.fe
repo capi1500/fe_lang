@@ -1,0 +1,51 @@
+fn clone(arr: &[i32]) -> [i32] {
+    const n = length_i32(arr);
+    var out = [n; 0];
+    for (i in 0..(n - 1)) {
+        out[i] = arr[i];
+    }
+    out
+}
+
+fn stream(mut arr: [i32], transformers: [Fn([i32]) -> [i32]]) -> [i32] {
+    for (f in transformers) {
+        arr = f(clone(&arr));
+    }
+    arr
+}
+
+fn input_arr() -> [i32] {
+    [input_i32(); input_i32()]
+}
+
+fn print(arr: &[i32]) {
+    print_char('[');
+    const n = length_i32(arr);
+    for (i in 0..(n - 1)) {
+        print_i32(arr[i]);
+        if (i + 1 != n) {
+            print_string(", ");
+        }
+    }
+    print_string("]\n");
+}
+
+fn map(f: Fn(i32) -> i32) -> Fn([i32]) -> [i32] {
+    |f|(mut arr: [i32]) -> [i32] {
+        const n = length_i32(&arr);
+        for (i in 0..n - 1) {
+            arr[i] = f(arr[i]);
+        }
+        arr
+    }
+}
+
+fn main() {
+    var x = input_arr();
+    var y = stream(x, [
+        map(| |(a: i32) -> i32 { a + 2 }),
+        map(| |(a: i32) -> i32 { a * 3 }),
+        map(| |(a: i32) -> i32 { a - 1 })
+    ]);
+    print(&y);
+}

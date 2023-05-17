@@ -146,7 +146,7 @@ instance Executable Expression Value where
         (pointer, variable) <- getVariable ident
         return $ VVariable pointer variable
     execute (ReferenceExpression e) = do
-        VVariable pointer _ <- execute e
+        VVariable pointer _ <- execute e >>= pack
         let variable = Variable $ VReference pointer
         newPointer <- addTmpVariable variable
         return $ VVariable newPointer variable

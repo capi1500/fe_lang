@@ -38,6 +38,15 @@ makeValue p (TReference Mutable t) owned = do
     borrowMut (innerPlace, p)
     return $ Value (TReference Mutable t) [] [] [(innerPlace, p)] owned
 
+recreateValue :: BNFC'Position -> Value -> PreprocessorMonad Value
+recreateValue p (Value (TArray t) _ borrows borrowsMut owned) = do
+    inner <- makeValue p t ByVariable
+    innerPlace <- addTemporaryVariable Mutable inner
+    return $ Value (TArray t) [innerPlace] borrows borrowsMut owned
+recreateValue p (Value t ownedPlaces borrows borrowsMut owned) = do
+    return $ Value t ownedPlaces borrows borrowsMut owned
+
+
 setValueType :: Type -> Value -> Value
 setValueType t (Value _ ownedPlaces borrows borrowsMut owned) =
     Value t ownedPlaces borrows borrowsMut owned

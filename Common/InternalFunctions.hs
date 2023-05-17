@@ -15,6 +15,7 @@ import Common.AstPrinter
 import Exec.StateFunctions
 import Exec.State
 import Data.ByteString (intercalate)
+import Exec.Utils
 
 makeInternalFunction :: Identifier -> [(Identifier, Type)] -> Type -> Expression -> (Identifier, Type, Value)
 makeInternalFunction name params return e =
@@ -48,13 +49,13 @@ printFunction :: ExecutorMonad Value
 printFunction = do
     (_, Variable v) <- getVariable "v"
     liftIO $ putStr (codePrint 0 v)
-    return VUnit
+    pack VUnit
 
 printCharFunction :: ExecutorMonad Value
 printCharFunction = do
     (_, Variable (VChar c)) <- getVariable "v"
     liftIO $ putStr [c]
-    return VUnit
+    pack VUnit
 
 printStringFunction :: ExecutorMonad Value
 printStringFunction = do
@@ -62,7 +63,7 @@ printStringFunction = do
     variables <- traverse getVariableById lst
     let chars = fmap (\(Variable (VChar c)) -> c) variables
     liftIO $ putStr chars
-    return VUnit
+    pack VUnit
 
 inputI32Function :: ExecutorMonad Value
 inputI32Function = do
@@ -72,7 +73,7 @@ inputI32Function = do
     putInput $ tail input
     let x = readMaybe word :: Maybe Int
     when (isNothing x) $ throwError (InputFailed p)
-    return $ VI32 (fromJust x)
+    pack $ VI32 (fromJust x)
 
 inputBoolFunction :: ExecutorMonad Value
 inputBoolFunction = do
@@ -80,9 +81,9 @@ inputBoolFunction = do
     let word = head input
     putInput $ tail input
     if word == "true" then do
-        return $ VBool True
+        pack $ VBool True
     else if word == "false" then do
-        return $ VBool False
+        pack $ VBool False
     else do
         p <- gets position
         throwError (InputFailed p)
@@ -93,7 +94,7 @@ inputStringFunction = do
     let word = head input
     putInput $ tail input
     pointers <- traverse (\v -> do addTmpVariable (Variable (VChar v))) word
-    return $ VArray pointers
+    pack $ VArray pointers
 
 inputCharFunction :: ExecutorMonad Value
 inputCharFunction = do
@@ -107,17 +108,17 @@ inputCharFunction = do
             let h:t = word
             putInput $ t:rest
             return h
-    return $ VChar c
+    pack $ VChar c
 
 lengthFunction :: ExecutorMonad Value
 lengthFunction = do
     (_, Variable (VReference ptr)) <- getVariable "v"
     Variable (VArray lst) <- getVariableById ptr
-    return $ VI32 (length lst)
+    pack $ VI32 (length lst)
 
 iterFunction :: ExecutorMonad Value
 iterFunction = do
     (_, Variable (VReference ptr)) <- getVariable "v"
     Variable (VArray lst) <- getVariableById ptr
     pointers <- traverse (\ptr -> do addTmpVariable (Variable (VReference ptr))) lst
-    return $ VArray pointers
+    pack $ VArray pointers
