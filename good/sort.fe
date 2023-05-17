@@ -1,15 +1,6 @@
-fn sort(arr: &mut [i32]) {
-	const n = length_i32(arr);
-	for (i in 1..n - 1) {
-		var j = i;
-		while (j > 0 && arr[j - 1] > arr[j]) {
-			const tmp = arr[j - 1];
-			arr[j - 1] = arr[j];
-			arr[j] = tmp;
-			j -= 1;
-			print(arr);
-		}
-	}
+fn input_arr() -> [i32] {
+	print_string("Input n - number of elements in table, then n numbers a_i - elements of the table");
+	[input_i32(); input_i32()]
 }
 
 fn print(arr: &[i32]) {
@@ -24,8 +15,18 @@ fn print(arr: &[i32]) {
 	print_string("]\n");
 }
 
-fn input_arr() -> [i32] {
-	[input_i32(); input_i32()]
+fn sort(arr: &mut [i32]) {
+	const n = length_i32(arr);
+	for (i in 1..n - 1) {
+		var j = i;
+		while (j > 0 && arr[j - 1] > arr[j]) {
+			const tmp = arr[j - 1];
+			arr[j - 1] = arr[j];
+			arr[j] = tmp;
+			j -= 1;
+			print(arr);
+		}
+	}
 }
 
 fn main() {

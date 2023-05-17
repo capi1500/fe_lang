@@ -11,7 +11,7 @@ import Common.Scope
 import TypeCheck.Variable
 import Common.Printer
 
-debug = True
+debug = False
 
 data PreprocessorError =
     InvalidStatementAtGlobalScope BNFC'Position |

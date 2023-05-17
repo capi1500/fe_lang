@@ -1,0 +1,37 @@
+fn input() -> [[i32]] {
+	const n = input_i32();
+	const m = input_i32();
+	[n; [m; input_i32()]]
+}
+
+fn print(arr: &[[i32]]) {
+	for (row in iter_array_i32(arr)) {
+		print_string("| ");
+		for (x in iter_i32(row)) {
+			print_i32(x);
+			print_string(" ");
+		}
+		print_string("|\n");
+	}
+}
+
+fn transpose(arr: &[[i32]]) -> [[i32]] {
+    const n = length_array_i32(arr);
+	if (n == 0) {
+		return [0; [0; 0]];
+	}
+	const m = length_i32(&arr[0]);
+    var out = [m; [n; 0]];
+    for (x in 0..n - 1) {
+		for (y in 0..m - 1) {
+			out[y][x] = arr[x][y];
+		}
+	}
+    out
+}
+
+fn main() {
+	const arr = input();
+	const arrT = transpose(&arr);
+	print(&arrT);
+}

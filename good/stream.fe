@@ -1,3 +1,20 @@
+fn input_arr() -> [i32] {
+	print_string("Input n - number of elements in table, then n numbers a_i - elements of the table");
+    [input_i32(); input_i32()]
+}
+
+fn print(arr: &[i32]) {
+    print_char('[');
+    const n = length_i32(arr);
+    for (i in 0..(n - 1)) {
+        print_i32(arr[i]);
+        if (i + 1 != n) {
+            print_string(", ");
+        }
+    }
+    print_string("]\n");
+}
+
 fn clone(arr: &[i32]) -> [i32] {
     const n = length_i32(arr);
     var out = [n; 0];
@@ -12,22 +29,6 @@ fn stream(mut arr: [i32], transformers: [Fn([i32]) -> [i32]]) -> [i32] {
         arr = f(clone(&arr));
     }
     arr
-}
-
-fn input_arr() -> [i32] {
-    [input_i32(); input_i32()]
-}
-
-fn print(arr: &[i32]) {
-    print_char('[');
-    const n = length_i32(arr);
-    for (i in 0..(n - 1)) {
-        print_i32(arr[i]);
-        if (i + 1 != n) {
-            print_string(", ");
-        }
-    }
-    print_string("]\n");
 }
 
 fn map(f: Fn(i32) -> i32) -> Fn([i32]) -> [i32] {
