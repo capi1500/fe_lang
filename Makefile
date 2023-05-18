@@ -3,7 +3,7 @@ HAPPY      = happy
 HAPPY_OPTS = --array --info --ghc --coerce
 ALEX       = alex
 ALEX_OPTS  = --ghc
-GHC_OPTS   = -fno-full-laziness
+GHC_OPTS   =
 
 .PHONY : all lang fe clean clean_all
 
