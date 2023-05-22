@@ -227,9 +227,7 @@ instance TypeCheck A.Expression TypedExpression where
             return condition'
         setInsideLoopExpression True
         (block', _) <- typeCheckInValueContext (Just unitType) block
-        s <- get
         _ <- typeCheckInValueContext (Just unitType) block -- check if block can be executed multiple times (so no move happens inside etc.)
-        put s
         setInsideLoopExpression False
         et <- makeValue p unitType ByExpression >>= createValueExpression
         return $ TypedExpression (WhileExpression condition' block') et
@@ -244,9 +242,7 @@ instance TypeCheck A.Expression TypedExpression where
             id <- makeValue (hasPosition e) innerT ByVariable >>= addVariable ident Const
             setInsideLoopExpression True
             (block', _) <- typeCheckInValueContext (Just unitType) block
-            s <- get
             _ <- typeCheckInValueContext (Just unitType) block -- check if block can be executed multiple times (so no move happens inside etc.)
-            put s
             setInsideLoopExpression False
             moveOutById id
             return block'
