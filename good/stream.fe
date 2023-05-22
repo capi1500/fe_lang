@@ -24,11 +24,13 @@ fn clone(arr: &[i32]) -> [i32] {
     out
 }
 
-fn stream(mut arr: [i32], transformers: [Fn([i32]) -> [i32]]) -> [i32] {
-    for (f in transformers) {
-        arr = f(clone(&arr));
+fn stream(arr: [i32], transformers: [Fn([i32]) -> [i32]], transformers_count: i32) -> [[i32]] {
+    var out = [transformers_count + 1; clone(&arr)];
+    out[0] = arr;
+    for (i in 1..transformers_count) {
+        out[i] = transformers[i - 1](clone(&out[i - 1]));
     }
-    arr
+    out
 }
 
 fn map(f: Fn(i32) -> i32) -> Fn([i32]) -> [i32] {
@@ -43,10 +45,12 @@ fn map(f: Fn(i32) -> i32) -> Fn([i32]) -> [i32] {
 
 fn main() {
     var x = input_arr();
-    var y = stream(x, [
+    var ys = stream(x, [
         map(| |(a: i32) -> i32 { a + 2 }),
         map(| |(a: i32) -> i32 { a * 3 }),
         map(| |(a: i32) -> i32 { a - 1 })
     ]);
-    print(&y);
+    for (y in ys) {
+        print(&y);
+    }
 }
