@@ -25,10 +25,12 @@ fn clone(arr: &[i32]) -> [i32] {
 }
 
 fn stream(arr: [i32], transformers: [Fn([i32]) -> [i32]], transformers_count: i32) -> [[i32]] {
-    var out = [transformers_count + 1; clone(&arr)];
+    var out = [transformers_count + 1; [0; 0]];
     out[0] = arr;
-    for (i in 1..transformers_count) {
-        out[i] = transformers[i - 1](clone(&out[i - 1]));
+    var i = 1;
+    for (f in transformers) {
+        out[i] = transformers(clone(&out[i - 1]));
+        i += 1;
     }
     out
 }
@@ -49,7 +51,7 @@ fn main() {
         map(| |(a: i32) -> i32 { a + 2 }),
         map(| |(a: i32) -> i32 { a * 3 }),
         map(| |(a: i32) -> i32 { a - 1 })
-    ]);
+    ], 3);
     for (y in ys) {
         print(&y);
     }

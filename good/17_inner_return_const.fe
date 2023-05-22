@@ -1,0 +1,20 @@
+fn main() {
+    fn foo(a: i32) -> i32 {
+        // wersja 1: 
+        var const_a: FnOnce() -> i32 = |&a|() -> i32 {
+            *a
+        };
+        /// wersja 2
+        // var const_a: Fn() -> i32 = |a|() -> i32 {
+        //     a
+        // };
+        if (a <= 1) {
+            const_a()
+        } else {
+            foo(a - 1) + foo(a - 2)
+        }
+    }
+
+    var x = input_i32();
+    print_i32(foo(x));
+}

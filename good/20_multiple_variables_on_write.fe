@@ -4,6 +4,6 @@ fn main() {
 	const z = if (true) { 
 		&mut x
 	} else {
-		&mut x
+		&mut y
 	};
 }
