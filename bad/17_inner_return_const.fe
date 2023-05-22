@@ -1,7 +1,7 @@
 fn main() {
     fn foo(a: i32) -> i32 {
-        var const_a: Fn() -> i32 = |a|() -> i32 {
-            a
+        var const_a: FnOnce() -> i32 = |&a|() -> i32 {
+            *a
         };
         if (a <= 1) {
             const_a()

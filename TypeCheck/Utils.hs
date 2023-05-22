@@ -125,8 +125,6 @@ mergeVariables vars1 vars2 = do
     mergeStates p id Uninitialized s2 = throw $ CannotMergeStateAfterIf p id Uninitialized s2
     mergeStates p id s1 Uninitialized = throw $ CannotMergeStateAfterIf p id s1 Uninitialized
     mergeStates p id Moved Moved = return Moved
-    mergeStates p id s1 Free = return s1
-    mergeStates p id Free s2 = return s2
     mergeStates p id Moved s2 = throw $ CannotMergeStateAfterIf p id Moved s2
     mergeStates p id s1 Moved = throw $ CannotMergeStateAfterIf p id s1 Moved
     mergeStates p id (Borrowed x1 set1) (Borrowed x2 set2) = do
@@ -135,6 +133,8 @@ mergeVariables vars1 vars2 = do
     mergeStates p id (BorrowedMut p1) (BorrowedMut p2) = do
         unless (p1 == p2) $ throw (CannotMergeStateAfterIf p id (BorrowedMut p1) (BorrowedMut p2))
         return $ BorrowedMut p1
+    mergeStates p id s1 Free = return s1
+    mergeStates p id Free s2 = return s2
     mergeStates p id s1 s2 = throw $ CannotMergeStateAfterIf p id s1 s2
 
     mergeValues v1 v2 =
