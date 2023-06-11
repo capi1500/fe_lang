@@ -24,6 +24,8 @@ import Exec.State
 import TypeCheck.TypeCheck (typeCheck)
 import TypeCheck.Error (PreprocessorError, debug)
 import TypeCheck.State (PreprocessorState (PreprocessorState, warnings), makePreprocessorState)
+import Compile.Compile (Compile(compile))
+import Compile.State
 
 type ParseFun a = [Token] -> Either String a
 
@@ -55,6 +57,7 @@ parse p s =
         when debug $ do
             printErr "TypeChecked ast\n"
             printErr $ codePrint 0 ast
+        compileStage ast >>= putStr
         executeStage ast
     where
     ts = myLexer s
@@ -83,6 +86,17 @@ printWarnings state = do
         printErr "Warnings:"
         printErr $ intercalate "\n" (fmap (codePrint 0) (reverse warnings'))
 
+compileStage :: PreprocessorOutput -> IO String
+compileStage code = do
+    handleCompileError $ runState (runExceptT (compile code)) makeCompilationState
+
+handleCompileError :: (Either CompilationError String, CompilationState) -> IO String
+handleCompileError (Left err, state) = do
+    printErr "Error in compile"
+    printErr $ show err
+    exitFailure
+handleCompileError (Right code, state) = do
+    return code
 
 executeStage :: PreprocessorOutput -> IO ()
 executeStage code = do

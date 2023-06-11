@@ -10,7 +10,7 @@ GHC_OPTS   =
 all : lang fe
 
 lang : 
-	-/home/students/inf/PUBLIC/MRJP/bin/bnfc --haskell -d --functor fe.cf
+	-bnfc --haskell -d --functor fe.cf
 	-${ALEX} ${ALEX_OPTS} Fe/Lex.x
 	-${HAPPY} ${HAPPY_OPTS} Fe/Par.y
 	-${GHC} ${GHC_OPTS} Fe/Par.hs
