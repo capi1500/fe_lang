@@ -16,6 +16,8 @@ import Data.List
 import Compile.StateFunctions
 import Common.Types
 import Compile.Utils
+import Data.Binary.Get (label)
+import Data.Maybe
 
 class Compile a b where
     compile :: a -> CompilationMonad b
@@ -43,7 +45,7 @@ instance Compile Code String where
         insertInternals
         traverse_ initializeGlobalScope statements
         traverse_ (\s -> compile s :: CompilationMonad ValueLocation) statements
-        CompilationState types functions _ _ _ _ <- get
+        CompilationState types functions _ _ _ _ _ _ <- get
         let types' = intercalate "\n" (fmap (\(TypeDef _ str) -> str) (elems types))
         let functions' = intercalate "\n" (fmap printFunction (toList functions))
         return $ types' ++ "\n" ++ functions'
@@ -56,30 +58,62 @@ initializeGlobalScope s = do
 
 instance Compile Statement ValueLocation where
     compile :: Statement -> CompilationMonad ValueLocation
-    compile EmptyStatement = return $ Imm "" 0
+    compile EmptyStatement = return Empty
     compile (TypeStatement t) = throw "Not yet implemented"
     compile (NewVariableStatement ident initialization) = do
-        throw "Not yet implemented"
+        ptr <- initVariable ident 8 "int32" -- because it's not in type checker, no way to verify type
+        l <- compile initialization
+        unless (l == Empty) $ compileFirstArg ptr l
+        return Empty
     compile (NewFunctionStatement ident expression paramNames) = do
         setNewFunction
         compile expression :: CompilationMonad ValueLocation
         function <- gets current_function
         implementFunction ident function
-        return $ Imm "" 0
+        return Empty
     compile (ExpressionStatement expression) = do
-        compile expression :: CompilationMonad ValueLocation
+        l <- compile expression
         clearStack
-        return $ Imm "" 0
+        return l
+
+instance Compile Initialization ValueLocation where
+  compile :: Initialization -> CompilationMonad ValueLocation
+  compile (VarInitialized e) = compile e
+  compile VarUninitialized = return Empty
+    
 
 instance Compile Expression ValueLocation where
     compile (BlockExpression statements) = do
         if null statements then do
-            return $ Imm "" 0
+            return Empty
         else do
             let last:prefix = reverse statements
             traverse_ (\s -> compile s :: CompilationMonad ValueLocation) (reverse prefix)
+            clearStack
             compile last
-    compile (IfExpression condition onTrue onFalse) = do throw "Not yet implemented"
+    compile (IfExpression condition onTrue onFalse) = do
+        compile condition :: CompilationMonad ValueLocation
+        clearStack
+        label <- newLabel
+        pointer <- addTemporaryVariable 8 "int32"
+        addOperand $ "jmpRelIfNot_label label_" ++ show label
+        l1 <- compile onTrue :: CompilationMonad ValueLocation
+        unless (l1 == Empty) $ compileFirstArg pointer l1
+        if isJust onFalse then do
+            label2 <- newLabel
+            addOperand $ "jmpRel_label label_" ++ show label2
+
+            addOperand $ "label label_" ++ show label
+            l2 <- compile (fromJust onFalse)
+
+            unless (l2 == Empty) $ compileFirstArg pointer l2
+            addOperand $ "label label_" ++ show label2
+        else do
+            addOperand $ "label label_" ++ show label
+        if l1 == Empty then do
+            return Empty
+        else do
+            return $ Stack pointer 8
     compile (WhileExpression cond block) = do throw "Not yet implemented"
     compile (ForExpression var range block) = do throw "Not yet implemented"
     compile (InternalExpression internal) = do throw "Not yet implemented"
@@ -106,7 +140,14 @@ instance Compile Expression ValueLocation where
         let (s1, s3) = compileSecondArg l2
         addOperand $ compileI32DoubleOperator op ++ "_l64_" ++ s1 ++ " " ++ show pointer ++ ", " ++ s3
         return $ Stack pointer 8
-    compile (BoolDoubleOperatorExpression op e1 e2) = do throw "Not yet implemented"
+    compile (BoolDoubleOperatorExpression op e1 e2) = do
+        l1 <- compile e1
+        l2 <- compile e2
+        pointer <- addTemporaryVariable 8 "int32"
+        compileFirstArg pointer l1
+        let (s1, s3) = compileSecondArg l2
+        addOperand $ compileBoolDoubleOperator op ++ "_l64_" ++ s1 ++ " " ++ show pointer ++ ", " ++ s3
+        return $ Stack pointer 8
     compile (RangeExpression e1 e2) = do throw "Not yet implemented"
     compile (AssignmentExpression place e) = do throw "Not yet implemented" -- expression1, expression2
     compile BreakExpression = do throw "Not yet implemented"
@@ -120,6 +161,12 @@ compileI32DoubleOperator Multiply = "mul"
 compileI32DoubleOperator Divide = "div"
 compileI32DoubleOperator Modulo = "mod"
 compileI32DoubleOperator _ = "unknown"  
+
+compileBoolDoubleOperator :: BooleanDoubleOperator -> String
+compileBoolDoubleOperator Equals = "cmpEq"
+compileBoolDoubleOperator Greater = "cmpG"
+compileBoolDoubleOperator Smaller = "cmpL"
+compileBoolDoubleOperator _ = "unknown"
 
 compileFirstArg :: Pointer -> ValueLocation -> CompilationMonad ()
 compileFirstArg tmp (Imm code _) = do
